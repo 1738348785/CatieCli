@@ -18,6 +18,65 @@ from app.config import settings
 router = APIRouter(tags=["API代理"])
 
 
+def get_model_category(model: str) -> str:
+    """判断模型类型: flash, pro25, pro30"""
+    model_lower = model.lower() if model else ""
+    if "2.5-pro" in model_lower or "2.5pro" in model_lower:
+        return "pro25"
+    elif "3-pro" in model_lower or "3.0" in model_lower or "thinking" in model_lower or "exp" in model_lower:
+        return "pro30"
+    else:
+        return "flash"
+
+
+async def check_user_quota(db: AsyncSession, user: User, model: str = None):
+    """检查用户配额，返回 (通过, 错误信息)"""
+    today = date.today()
+    
+    # 总配额检查
+    total_result = await db.execute(
+        select(func.count(UsageLog.id))
+        .where(UsageLog.user_id == user.id)
+        .where(func.date(UsageLog.created_at) == today)
+    )
+    total_usage = total_result.scalar() or 0
+    
+    if total_usage >= user.daily_quota:
+        return False, "已达到今日总配额限制"
+    
+    # 分类配额检查（如果设置了且 > 0）
+    if model:
+        category = get_model_category(model)
+        quota_limit = 0
+        model_filter = None
+        
+        if category == "flash" and user.flash_quota and user.flash_quota > 0:
+            quota_limit = user.flash_quota
+            model_filter = UsageLog.model.ilike("%flash%")
+        elif category == "pro25" and user.pro25_quota and user.pro25_quota > 0:
+            quota_limit = user.pro25_quota
+            model_filter = UsageLog.model.ilike("%2.5%pro%")
+        elif category == "pro30" and user.pro30_quota and user.pro30_quota > 0:
+            quota_limit = user.pro30_quota
+            # 3.0 模型包括 thinking, exp, 3-pro 等
+            model_filter = (UsageLog.model.ilike("%3%pro%") | UsageLog.model.ilike("%thinking%") | UsageLog.model.ilike("%exp%"))
+        
+        if quota_limit > 0 and model_filter is not None:
+            category_result = await db.execute(
+                select(func.count(UsageLog.id))
+                .where(UsageLog.user_id == user.id)
+                .where(func.date(UsageLog.created_at) == today)
+                .where(model_filter)
+            )
+            category_usage = category_result.scalar() or 0
+            
+            if category_usage >= quota_limit:
+                category_name = {"flash": "Flash", "pro25": "2.5 Pro", "pro30": "3.0 Pro"}.get(category, category)
+                return False, f"已达到今日 {category_name} 配额限制 ({category_usage}/{quota_limit})"
+    
+    return True, None
+
+
 async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get_db)) -> User:
     """从请求中提取API Key并验证用户"""
     api_key = None
@@ -45,17 +104,10 @@ async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账户已被禁用")
     
-    # 检查配额
-    today = date.today()
-    result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.user_id == user.id)
-        .where(func.date(UsageLog.created_at) == today)
-    )
-    today_usage = result.scalar() or 0
-    
-    if today_usage >= user.daily_quota:
-        raise HTTPException(status_code=429, detail="已达到今日配额限制")
+    # 基础配额检查（不含模型类型）
+    passed, error = await check_user_quota(db, user)
+    if not passed:
+        raise HTTPException(status_code=429, detail=error)
     
     return user
 

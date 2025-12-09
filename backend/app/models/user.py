@@ -17,7 +17,10 @@ class User(Base):
     discord_name = Column(String(100), nullable=True)  # Discord 用户名
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
-    daily_quota = Column(Integer, default=100)  # 每日请求配额
+    daily_quota = Column(Integer, default=100)  # 每日总请求配额
+    flash_quota = Column(Integer, default=0)  # Flash 模型配额 (0=无限制，使用总配额)
+    pro25_quota = Column(Integer, default=0)  # 2.5 Pro 模型配额 (0=无限制)
+    pro30_quota = Column(Integer, default=0)  # 3.0 Pro 模型配额 (0=无限制)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关系
