@@ -20,14 +20,14 @@
 
 ### OpenAI 兼容接口
 
-```
+```text
 POST /v1/chat/completions
 POST /chat/completions
 ```
 
 ### Gemini 原生接口
 
-```
+```text
 POST /v1beta/models/{model}:generateContent
 POST /v1/models/{model}:generateContent
 POST /models/{model}:generateContent
@@ -407,6 +407,7 @@ docker-compose up -d --build
 | Zeabur/Vercel 等 | `https://xxx.zeabur.app`  | ❌ 平台自动处理   |
 
 **简单来说：**
+
 - 用域名访问 → 不用管端口，反向代理会处理
 - 用 IP 访问 → 需要知道端口号（默认 5001）
 
@@ -415,6 +416,7 @@ docker-compose up -d --build
 如果你需要修改默认端口：
 
 **Docker Compose：**
+
 ```yaml
 environment:
   - PORT=8080
@@ -423,9 +425,11 @@ ports:
 ```
 
 **1Panel 环境变量：**
-```
+
+```text
 PORT=8080
 ```
+
 同时端口映射也改成 `8080:8080`
 
 ## ⚙️ 配置说明
