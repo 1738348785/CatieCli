@@ -387,6 +387,116 @@ async def verify_all_credentials(
     return results
 
 
+# Google Gemini CLI 配额参考（每日请求数限制）
+# Pro 订阅账号: CLI 总额度 1000，2.5/3.0 共用 250
+# 普通账号: 总额度 1500，2.5/3.0 共用 200
+QUOTA_LIMITS = {
+    "pro": {"total": 1000, "premium": 250},   # Pro 账号
+    "free": {"total": 1500, "premium": 200},  # 普通账号
+}
+
+# 高级模型（2.5-pro, 3.0 系列）共享 premium 配额
+PREMIUM_MODELS = ["gemini-2.5-pro", "gemini-3-pro", "gemini-3-pro-preview", "gemini-3-pro-high", "gemini-3-pro-low", "gemini-3-pro-image"]
+
+
+@router.get("/credentials/{credential_id}/quota")
+async def get_credential_quota(
+    credential_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取单个凭证的配额使用情况"""
+    # 检查凭证权限
+    cred = await db.get(Credential, credential_id)
+    if not cred:
+        raise HTTPException(status_code=404, detail="凭证不存在")
+    if cred.user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="无权查看此凭证")
+    
+    # 获取今天的开始时间（UTC）
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 判断账号类型（根据 account_type 字段）
+    is_pro = cred.account_type == "pro" if hasattr(cred, 'account_type') else False
+    quota_config = QUOTA_LIMITS["pro"] if is_pro else QUOTA_LIMITS["free"]
+    
+    # 查询今天该凭证按模型的使用次数
+    result = await db.execute(
+        select(UsageLog.model, func.count(UsageLog.id).label("count"))
+        .where(UsageLog.credential_id == credential_id)
+        .where(UsageLog.created_at >= today_start)
+        .where(UsageLog.status_code == 200)  # 只统计成功的请求
+        .group_by(UsageLog.model)
+    )
+    usage_by_model = result.all()
+    
+    # 统计各模型使用情况
+    quota_info = []
+    total_used = 0
+    premium_used = 0
+    
+    for model, count in usage_by_model:
+        if not model:
+            continue
+        total_used += count
+        
+        # 获取基础模型名（去掉后缀）
+        base_model = model
+        for suffix in ["-maxthinking", "-nothinking", "-search"]:
+            if base_model.endswith(suffix):
+                base_model = base_model.replace(suffix, "")
+                break
+        
+        # 判断是否为高级模型
+        is_premium = any(pm in base_model for pm in PREMIUM_MODELS)
+        if is_premium:
+            premium_used += count
+        
+        quota_info.append({
+            "model": model,
+            "used": count,
+            "is_premium": is_premium
+        })
+    
+    # 按使用量排序
+    quota_info.sort(key=lambda x: -x["used"])
+    
+    # 计算总配额
+    total_limit = quota_config["total"]
+    total_remaining = max(0, total_limit - total_used)
+    total_percentage = min(100, (total_remaining / total_limit) * 100) if total_limit > 0 else 0
+    
+    # 计算高级模型配额（2.5-pro + 3.0 共享）
+    premium_limit = quota_config["premium"]
+    premium_remaining = max(0, premium_limit - premium_used)
+    premium_percentage = min(100, (premium_remaining / premium_limit) * 100) if premium_limit > 0 else 0
+    
+    # 获取最后重置时间（每日 UTC 0:00 重置）
+    next_reset = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+    
+    return {
+        "credential_id": credential_id,
+        "credential_name": cred.name,
+        "email": cred.email,
+        "account_type": "pro" if is_pro else "free",
+        "reset_time": next_reset.isoformat() + "Z",
+        "total": {
+            "used": total_used,
+            "limit": total_limit,
+            "remaining": total_remaining,
+            "percentage": round(total_percentage, 1)
+        },
+        "premium": {
+            "used": premium_used,
+            "limit": premium_limit,
+            "remaining": premium_remaining,
+            "percentage": round(premium_percentage, 1),
+            "note": "2.5-pro 和 3.0 系列共用"
+        },
+        "models": quota_info
+    }
+
+
 # ===== 使用统计 =====
 
 @router.get("/stats/overview")

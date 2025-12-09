@@ -23,6 +23,8 @@ export default function Credentials() {
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [dragOver, setDragOver] = useState(false)
+  const [quotaModal, setQuotaModal] = useState(null)  // 存储配额数据
+  const [loadingQuota, setLoadingQuota] = useState(false)
 
   useEffect(() => {
     fetchCredentials()
@@ -139,6 +141,18 @@ export default function Credentials() {
       setMessage({ type: 'error', text: '检测失败: ' + (err.response?.data?.detail || err.message) })
     } finally {
       setVerifying(null)
+    }
+  }
+
+  const fetchQuota = async (id) => {
+    setLoadingQuota(true)
+    try {
+      const res = await api.get(`/api/manage/credentials/${id}/quota`)
+      setQuotaModal(res.data)
+    } catch (err) {
+      setMessage({ type: 'error', text: '获取配额失败: ' + (err.response?.data?.detail || err.message) })
+    } finally {
+      setLoadingQuota(false)
     }
   }
 
@@ -367,6 +381,17 @@ export default function Credentials() {
                         {cred.is_active ? '禁用' : '启用'}
                       </button>
                       
+                      {/* 配额 */}
+                      <button
+                        onClick={() => fetchQuota(cred.id)}
+                        disabled={loadingQuota}
+                        className="px-3 py-1.5 rounded text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 flex items-center gap-1"
+                        title="查看配额使用情况"
+                      >
+                        <BarChart2 size={12} />
+                        配额
+                      </button>
+                      
                       {/* 检测 */}
                       <button
                         onClick={() => verifyCred(cred.id)}
@@ -432,6 +457,145 @@ export default function Credentials() {
           </ul>
         </div>
       </div>
+
+      {/* 配额弹窗 */}
+      {quotaModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-800 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden">
+            {/* 弹窗头部 */}
+            <div className="flex items-center justify-between p-4 border-b border-dark-600">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <BarChart2 className="text-indigo-400" />
+                  模型配额信息
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">{quotaModal.email || quotaModal.credential_name}</p>
+              </div>
+              <button 
+                onClick={() => setQuotaModal(null)}
+                className="p-2 hover:bg-dark-600 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* 账号类型 */}
+            <div className="px-4 pt-3">
+              <span className={`text-xs px-2 py-1 rounded ${
+                quotaModal.account_type === 'pro' 
+                  ? 'bg-yellow-500/20 text-yellow-400' 
+                  : 'bg-gray-600/50 text-gray-400'
+              }`}>
+                {quotaModal.account_type === 'pro' ? '⭐ Pro 账号' : '普通账号'}
+              </span>
+            </div>
+            
+            {/* 总配额 */}
+            {quotaModal.total && (
+              <div className="p-4 border-b border-dark-600">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-semibold">CLI 总配额</span>
+                  <span className={`font-bold ${
+                    quotaModal.total.percentage > 50 ? 'text-green-400' : 
+                    quotaModal.total.percentage > 20 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {quotaModal.total.percentage}%
+                  </span>
+                </div>
+                <div className="h-3 bg-dark-600 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${
+                      quotaModal.total.percentage > 50 ? 'bg-green-500' : 
+                      quotaModal.total.percentage > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${quotaModal.total.percentage}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                  <span>已用 {quotaModal.total.used} / {quotaModal.total.limit}</span>
+                  <span>剩余 {quotaModal.total.remaining}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* 高级模型配额 */}
+            {quotaModal.premium && (
+              <div className="p-4 border-b border-dark-600">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-semibold text-purple-400">2.5-pro / 3.0 配额</span>
+                  <span className={`font-bold ${
+                    quotaModal.premium.percentage > 50 ? 'text-green-400' : 
+                    quotaModal.premium.percentage > 20 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {quotaModal.premium.percentage}%
+                  </span>
+                </div>
+                <div className="h-3 bg-dark-600 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${
+                      quotaModal.premium.percentage > 50 ? 'bg-purple-500' : 
+                      quotaModal.premium.percentage > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${quotaModal.premium.percentage}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                  <span>已用 {quotaModal.premium.used} / {quotaModal.premium.limit}</span>
+                  <span>剩余 {quotaModal.premium.remaining}</span>
+                </div>
+                <div className="text-xs text-purple-400/60 mt-1">{quotaModal.premium.note}</div>
+              </div>
+            )}
+            
+            {/* 各模型配额 */}
+            <div className="p-4 overflow-y-auto max-h-[50vh] space-y-3">
+              <div className="text-xs text-gray-500 mb-2">各模型使用情况（配额可能共享）</div>
+              {quotaModal.models?.filter(m => m.used > 0).length === 0 ? (
+                <div className="text-center text-gray-500 py-4">
+                  今日暂无使用记录
+                </div>
+              ) : quotaModal.models?.filter(m => m.used > 0).map(item => (
+                <div key={item.model} className="flex items-center justify-between py-2 border-b border-dark-700 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{item.model}</span>
+                    {item.is_premium && (
+                      <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                        高级
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-gray-400 text-sm font-medium">
+                    {item.used} 次
+                  </span>
+                </div>
+              ))}
+            </div>
+            
+            {/* 弹窗底部 */}
+            <div className="p-4 border-t border-dark-600 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                重置时间: {new Date(quotaModal.reset_time).toLocaleString()}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchQuota(quotaModal.credential_id)}
+                  disabled={loadingQuota}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50"
+                >
+                  {loadingQuota ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  刷新
+                </button>
+                <button
+                  onClick={() => setQuotaModal(null)}
+                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-lg text-sm"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
