@@ -96,9 +96,71 @@ CatieCli/
     └── requirements.txt
 ```
 
-## 🚀 快速开始
+## 🚀 部署教程
 
-### 后端部署
+### 方式一：1Panel 面板部署（推荐）
+
+#### 1. 下载代码
+
+```bash
+cd /opt
+git clone https://github.com/mzrodyu/CatieCli.git
+```
+
+#### 2. 部署后端
+
+在 1Panel → 网站 → 运行环境 → Python → 创建运行环境：
+
+| 配置项   | 值                                                 |
+| -------- | -------------------------------------------------- |
+| 名称     | `catiecli`                                         |
+| 项目目录 | `/opt/CatieCli/backend`                            |
+| 启动命令 | `pip install -r requirements.txt && python run.py` |
+| 应用     | Python 3.10+                                       |
+| 容器名称 | `catiecli`                                         |
+
+**端口配置：** 添加端口映射 `5001:5001`
+
+**环境变量：**（点击"环境变量"标签添加）
+
+```
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=你的管理员密码
+SECRET_KEY=随机字符串
+```
+
+#### 3. 部署 Discord Bot（可选）
+
+再创建一个运行环境：
+
+| 配置项   | 值                                                 |
+| -------- | -------------------------------------------------- |
+| 名称     | `catiecli-bot`                                     |
+| 项目目录 | `/opt/CatieCli/discord-bot`                        |
+| 启动命令 | `pip install -r requirements.txt && python bot.py` |
+| 应用     | Python 3.10+                                       |
+| 容器名称 | `catiecli-bot`                                     |
+
+**环境变量：**
+
+```
+DISCORD_TOKEN=你的Discord_Bot_Token
+API_BASE_URL=http://catiecli:5001
+API_PUBLIC_URL=https://你的域名
+```
+
+#### 4. 配置反向代理
+
+在 1Panel → 网站 → 反向代理 → 创建：
+
+- 域名：你的域名
+- 代理地址：`http://127.0.0.1:5001`
+
+---
+
+### 方式二：命令行部署
+
+#### 后端
 
 ```bash
 cd backend
@@ -106,30 +168,14 @@ cd backend
 # 安装依赖
 pip install -r requirements.txt
 
-# 复制配置文件
-cp .env.example .env
-# 编辑 .env 设置必要的配置
+# 首次启动会自动创建 .env 文件
+# 可选：编辑 .env 修改配置
 
 # 启动服务
 python run.py
 ```
 
-### 前端部署
-
-```bash
-cd frontend
-
-# 安装依赖
-npm install
-
-# 开发模式
-npm run dev
-
-# 构建生产版本（输出到 backend/static）
-npm run build
-```
-
-### Discord Bot 部署
+#### Discord Bot
 
 ```bash
 cd discord-bot
@@ -140,11 +186,51 @@ pip install -r requirements.txt
 # 设置环境变量
 export DISCORD_TOKEN=your_discord_bot_token
 export API_BASE_URL=http://localhost:5001
-export API_PUBLIC_URL=http://your-domain:5001
+export API_PUBLIC_URL=https://your-domain.com
 
 # 启动 Bot
 python bot.py
 ```
+
+---
+
+### 方式三：Docker 部署
+
+#### 后端
+
+```bash
+cd backend
+docker build -t catiecli .
+docker run -d \
+  -p 5001:5001 \
+  -v ./data:/app/data \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=your_password \
+  -e SECRET_KEY=random_string \
+  catiecli
+```
+
+#### Discord Bot
+
+```bash
+cd discord-bot
+docker build -t catiecli-bot .
+docker run -d \
+  -e DISCORD_TOKEN=your_token \
+  -e API_BASE_URL=http://host.docker.internal:5001 \
+  -e API_PUBLIC_URL=https://your-domain.com \
+  catiecli-bot
+```
+
+---
+
+## ⚠️ 注意事项
+
+- **首次启动**自动创建 `.env` 配置文件和管理员账号
+- **环境变量优先级**高于 `.env` 文件配置
+- **修改管理员**用户名/密码后重启即生效，旧管理员自动降级
+- **前端已构建**，无需手动 npm build
+- **默认账号**：`admin` / `admin123`（请立即修改！）
 
 ## ⚙️ 配置说明
 
