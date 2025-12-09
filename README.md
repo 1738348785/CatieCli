@@ -316,13 +316,16 @@ python bot.py
 git clone https://github.com/mzrodyu/CatieCli.git
 cd CatieCli
 
-# 2. 修改配置（可选）
-# 编辑 docker-compose.yml 修改 ADMIN_PASSWORD 和 SECRET_KEY
+# 2. 创建配置文件
+cp .env.example .env
 
-# 3. 一键启动
+# 3. 修改配置
+nano .env  # 修改 ADMIN_PASSWORD 和 SECRET_KEY
+
+# 4. 一键启动
 docker-compose up -d
 
-# 4. 查看日志
+# 5. 查看日志
 docker-compose logs -f
 ```
 
