@@ -18,14 +18,10 @@ export default function Register() {
 
   const [discordOnly, setDiscordOnly] = useState(false)
 
-  // 检查 Discord 登录是否启用
+  // 检查 Discord 登录是否启用和是否仅允许 Discord 注册
   useEffect(() => {
     api.get('/api/auth/discord/config').then(res => {
       setDiscordEnabled(res.data.enabled)
-    }).catch(() => {})
-    
-    // 检查是否仅允许 Discord OAuth 注册
-    api.get('/api/manage/config').then(res => {
       setDiscordOnly(res.data.discord_oauth_only)
     }).catch(() => {})
 

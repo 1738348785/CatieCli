@@ -973,5 +973,6 @@ async def get_discord_config():
     """获取 Discord OAuth 配置状态"""
     return {
         "enabled": bool(settings.discord_client_id and settings.discord_client_secret),
-        "client_id": settings.discord_client_id if settings.discord_client_id else None
+        "client_id": settings.discord_client_id if settings.discord_client_id else None,
+        "discord_oauth_only": settings.discord_oauth_only
     }
