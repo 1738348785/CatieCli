@@ -41,6 +41,13 @@ async def list_users(
         )
         today_usage = usage_result.scalar() or 0
         
+        # 获取用户凭证数量
+        cred_result = await db.execute(
+            select(func.count(Credential.id))
+            .where(Credential.user_id == u.id)
+        )
+        credential_count = cred_result.scalar() or 0
+        
         user_list.append({
             "id": u.id,
             "username": u.username,
@@ -49,6 +56,7 @@ async def list_users(
             "is_admin": u.is_admin,
             "daily_quota": u.daily_quota,
             "today_usage": today_usage,
+            "credential_count": credential_count,
             "discord_id": u.discord_id,
             "discord_name": u.discord_name,
             "created_at": u.created_at

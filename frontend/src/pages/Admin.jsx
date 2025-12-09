@@ -302,6 +302,7 @@ export default function Admin() {
                       <th>Discord</th>
                       <th>配额</th>
                       <th>今日使用</th>
+                      <th>凭证数</th>
                       <th>状态</th>
                       <th>操作</th>
                     </tr>
@@ -335,6 +336,9 @@ export default function Admin() {
                           </button>
                         </td>
                         <td>{u.today_usage}</td>
+                        <td className={u.credential_count > 0 ? 'text-green-400' : 'text-gray-500'}>
+                          {u.credential_count || 0}
+                        </td>
                         <td>
                           {u.is_active ? (
                             <span className="text-green-400">活跃</span>
