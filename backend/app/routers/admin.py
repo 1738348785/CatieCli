@@ -41,12 +41,19 @@ async def list_users(
         )
         today_usage = usage_result.scalar() or 0
         
-        # 获取用户凭证数量
+        # 获取用户凭证数量（有效凭证）
         cred_result = await db.execute(
             select(func.count(Credential.id))
             .where(Credential.user_id == u.id)
+            .where(Credential.is_active == True)
         )
         credential_count = cred_result.scalar() or 0
+        
+        # 计算有效配额（考虑无凭证限制）
+        from app.config import settings
+        effective_quota = u.daily_quota
+        if settings.no_credential_quota > 0 and credential_count == 0:
+            effective_quota = min(u.daily_quota, settings.no_credential_quota)
         
         user_list.append({
             "id": u.id,
@@ -54,7 +61,7 @@ async def list_users(
             "email": u.email,
             "is_active": u.is_active,
             "is_admin": u.is_admin,
-            "daily_quota": u.daily_quota,
+            "daily_quota": effective_quota,
             "today_usage": today_usage,
             "credential_count": credential_count,
             "discord_id": u.discord_id,

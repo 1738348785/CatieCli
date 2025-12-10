@@ -92,6 +92,28 @@ async def batch_credential_action(
     return {"message": f"已对 {len(ids)} 个凭证执行 {action} 操作"}
 
 
+@router.delete("/credentials/inactive")
+async def delete_inactive_credentials(
+    user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """一键删除所有无效凭证"""
+    result = await db.execute(
+        select(Credential).where(Credential.is_active == False)
+    )
+    inactive_creds = result.scalars().all()
+    
+    if not inactive_creds:
+        return {"message": "没有无效凭证", "deleted_count": 0}
+    
+    deleted_count = len(inactive_creds)
+    for cred in inactive_creds:
+        await db.delete(cred)
+    
+    await db.commit()
+    return {"message": f"已删除 {deleted_count} 个无效凭证", "deleted_count": deleted_count}
+
+
 @router.get("/credentials/export")
 async def export_credentials(
     user: User = Depends(get_current_admin),
