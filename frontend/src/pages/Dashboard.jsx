@@ -380,7 +380,7 @@ export default function Dashboard() {
                 <div className="text-center">
                   <div className="text-4xl font-bold mb-2">
                     <span className="text-blue-400">{userInfo?.today_usage || 0}</span>
-                    <span className="text-gray-500"> / {userInfo?.daily_quota || 100}</span>
+                    <span className="text-gray-500"> / {userInfo?.daily_quota ?? 100}</span>
                   </div>
                   <div className="text-gray-400">已使用 / 调用上限</div>
                 </div>
