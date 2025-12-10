@@ -1,5 +1,6 @@
 {
   "root_directory": "backend",
   "build_command": "pip install -r requirements.txt",
-  "start_command": "python run.py"
+  "start_command": "python run.py",
+  "serverless": false
 }
