@@ -428,12 +428,32 @@ async def upload_credentials(
             results.append({"filename": filename, "status": "success" if is_valid else "warning", "message": status_msg})
             success_count += 1
             
+            # 每50个凭证提交一次，避免大事务超时
+            if success_count % 50 == 0:
+                try:
+                    await db.commit()
+                    print(f"[批量上传] 已提交 {success_count} 个凭证", flush=True)
+                except Exception as commit_err:
+                    print(f"[批量上传] 提交失败: {commit_err}", flush=True)
+            
         except json.JSONDecodeError:
             results.append({"filename": filename, "status": "error", "message": "JSON 格式错误"})
         except Exception as e:
             results.append({"filename": filename, "status": "error", "message": str(e)})
     
-    await db.commit()
+    # 最终提交剩余的
+    try:
+        await db.commit()
+        print(f"[批量上传] 最终提交完成，共 {success_count} 个凭证", flush=True)
+    except Exception as final_err:
+        print(f"[批量上传] 最终提交失败: {final_err}", flush=True)
+        # 尝试回滚后重新提交
+        try:
+            await db.rollback()
+            await db.commit()
+        except:
+            pass
+    
     return {"uploaded_count": success_count, "total_count": len(json_files), "results": results}
 
 
