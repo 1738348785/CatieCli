@@ -13,6 +13,7 @@ import {
     RefreshCw,
     Settings,
     Shield,
+    Trash2,
     Upload,
     Users,
     X,
@@ -475,7 +476,25 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">我的凭证 ({myCredentials.length})</h2>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                {myCredentials.some(c => !c.is_active) && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm('确定要删除所有失效凭证吗？')) return
+                      try {
+                        const res = await api.delete('/api/auth/credentials/inactive/batch')
+                        alert(res.data.message)
+                        fetchCredentials()
+                      } catch (err) {
+                        alert(err.response?.data?.detail || '删除失败')
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
+                  >
+                    <Trash2 size={16} />
+                    删除失效
+                  </button>
+                )}
                 <Link 
                   to="/credentials"
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2"

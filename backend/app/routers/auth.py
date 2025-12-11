@@ -571,6 +571,34 @@ async def delete_my_credential(
     return {"message": "删除成功"}
 
 
+@router.delete("/credentials/inactive/batch")
+async def delete_my_inactive_credentials(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """批量删除我的所有失效凭证"""
+    result = await db.execute(
+        select(Credential).where(
+            Credential.user_id == user.id,
+            Credential.is_active == False
+        )
+    )
+    inactive_creds = result.scalars().all()
+    
+    if not inactive_creds:
+        return {"message": "没有失效凭证需要删除", "deleted_count": 0}
+    
+    deleted_count = 0
+    for cred in inactive_creds:
+        # 失效凭证不需要扣除额度（已经扣过了）
+        await db.delete(cred)
+        deleted_count += 1
+    
+    await db.commit()
+    print(f"[批量删除] 用户 {user.username} 删除了 {deleted_count} 个失效凭证", flush=True)
+    return {"message": f"已删除 {deleted_count} 个失效凭证", "deleted_count": deleted_count}
+
+
 @router.get("/credentials/{cred_id}/export")
 async def export_my_credential(
     cred_id: int,
@@ -961,7 +989,9 @@ async def discord_callback(code: str, db: AsyncSession = Depends(get_db)):
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(token_url, data=data)
         if token_resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Discord 授权失败")
+            error_detail = token_resp.text[:200] if token_resp.text else "未知错误"
+            print(f"[Discord OAuth] Token请求失败: {token_resp.status_code} - {error_detail}", flush=True)
+            raise HTTPException(status_code=400, detail=f"Discord 授权失败: {error_detail}")
         token_data = token_resp.json()
         access_token = token_data.get("access_token")
         
