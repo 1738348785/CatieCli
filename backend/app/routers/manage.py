@@ -949,13 +949,16 @@ async def get_global_stats(
     )
     tier3_creds = tier3_cred_result.scalar() or 0
     
-    # 全站总额度（基于有效凭证计算）
+    # 全站总额度（基于公共池的有效凭证计算，私有凭证额度不计入全站）
     total_quota_flash = 0
     total_quota_25pro = 0
     total_quota_30pro = 0
     
     active_creds_result = await db.execute(
-        select(Credential.model_tier).where(Credential.is_active == True)
+        select(Credential.model_tier).where(
+            Credential.is_active == True,
+            Credential.is_public == True
+        )
     )
     for tier in active_creds_result.scalars().all():
         if tier == "3":
