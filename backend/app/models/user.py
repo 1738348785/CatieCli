@@ -17,7 +17,8 @@ class User(Base):
     discord_name = Column(String(100), nullable=True)  # Discord 用户名
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
-    daily_quota = Column(Integer, default=100)  # 每日请求配额
+    daily_quota = Column(Integer, default=100)  # 基础每日配额（管理员设置）
+    bonus_quota = Column(Integer, default=0)  # 凭证奖励配额（自动计算，凭证失效时扣除）
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关系

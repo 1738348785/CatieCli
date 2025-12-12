@@ -49,11 +49,11 @@ async def list_users(
         )
         credential_count = cred_result.scalar() or 0
         
-        # 计算有效配额（考虑无凭证限制）
+        # 计算有效配额：基础配额 + 奖励配额
         from app.config import settings
-        effective_quota = u.daily_quota
+        effective_quota = u.daily_quota + (u.bonus_quota or 0)
         if settings.no_credential_quota > 0 and credential_count == 0:
-            effective_quota = min(u.daily_quota, settings.no_credential_quota)
+            effective_quota = min(effective_quota, settings.no_credential_quota)
         
         user_list.append({
             "id": u.id,

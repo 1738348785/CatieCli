@@ -17,27 +17,34 @@ export default function Stats() {
   }, [days])
 
   const fetchStats = async () => {
-    try {
-      setLoading(true)
-      const [overviewRes, globalRes, modelRes, userRes, dailyRes] = await Promise.all([
-        api.get('/api/manage/stats/overview'),
-        api.get('/api/manage/stats/global'),
-        api.get(`/api/manage/stats/by-model?days=${days}`),
-        api.get(`/api/manage/stats/by-user?days=${days}`),
-        api.get(`/api/manage/stats/daily?days=${days}`),
-      ])
-      setOverview(overviewRes.data)
-      setGlobalStats(globalRes.data)
-      setByModel(modelRes.data.models || [])
-      setByUser(userRes.data.users || [])
-      setDaily(dailyRes.data.daily || [])
-    } catch (err) {
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        navigate('/login')
-      }
-    } finally {
-      setLoading(false)
+    setLoading(true)
+    // 独立请求每个API，避免一个失败导致全部为空
+    const results = await Promise.allSettled([
+      api.get('/api/manage/stats/overview'),
+      api.get('/api/manage/stats/global'),
+      api.get(`/api/manage/stats/by-model?days=${days}`),
+      api.get(`/api/manage/stats/by-user?days=${days}`),
+      api.get(`/api/manage/stats/daily?days=${days}`),
+    ])
+    
+    // 检查是否有权限错误
+    const authError = results.find(r => 
+      r.status === 'rejected' && 
+      (r.reason?.response?.status === 401 || r.reason?.response?.status === 403)
+    )
+    if (authError) {
+      navigate('/login')
+      return
     }
+    
+    // 分别处理每个结果
+    if (results[0].status === 'fulfilled') setOverview(results[0].value.data)
+    if (results[1].status === 'fulfilled') setGlobalStats(results[1].value.data)
+    if (results[2].status === 'fulfilled') setByModel(results[2].value.data.models || [])
+    if (results[3].status === 'fulfilled') setByUser(results[3].value.data.users || [])
+    if (results[4].status === 'fulfilled') setDaily(results[4].value.data.daily || [])
+    
+    setLoading(false)
   }
 
   const poolModeLabel = {

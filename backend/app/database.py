@@ -39,6 +39,7 @@ async def init_db():
         from sqlalchemy import text
         migrations = [
             "ALTER TABLE usage_logs ADD COLUMN credential_id INTEGER REFERENCES credentials(id)",
+            "ALTER TABLE users ADD COLUMN bonus_quota INTEGER DEFAULT 0",
         ]
         for sql in migrations:
             try:
