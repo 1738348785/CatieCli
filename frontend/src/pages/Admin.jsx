@@ -286,7 +286,7 @@ export default function Admin() {
   }
 
   const deleteDuplicates = async () => {
-    if (!confirm(`确定要删除所有重复凭证吗？\n\n将保留每组最早上传的凭证，删除其他 ${duplicateModal.data?.duplicate_count || 0} 个重复凭证。\n\n此操作不可撤销！`)) {
+    if (!confirm(`确定要删除所有重复凭证吗？\n\n将优先保留每组有效凭证，如果都有效或都无效则保留最早上传的，删除其他 ${duplicateModal.data?.duplicate_count || 0} 个重复凭证。\n\n此操作不可撤销！`)) {
       return
     }
     setDuplicateModal(prev => ({ ...prev, loading: true }))

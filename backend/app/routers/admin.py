@@ -470,7 +470,7 @@ async def delete_duplicate_credentials(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """删除重复凭证（保留每组最早上传的，删除其他重复的）"""
+    """删除重复凭证（优先保留有效凭证，如果都有效或都无效则保留最早的）"""
     from app.services.crypto import decrypt_credential
     from collections import defaultdict
     
@@ -480,7 +480,7 @@ async def delete_duplicate_credentials(
     )
     credentials = result.scalars().all()
     
-    # 按邮箱分组
+    # 按邮箱分组（存储完整凭证对象以便判断is_active）
     email_groups = defaultdict(list)
     # 按 refresh_token 分组
     token_groups = defaultdict(list)
@@ -488,7 +488,7 @@ async def delete_duplicate_credentials(
     for c in credentials:
         # 按邮箱分组
         if c.email:
-            email_groups[c.email].append(c.id)
+            email_groups[c.email].append(c)
         
         # 按 refresh_token 分组
         if c.refresh_token:
@@ -496,21 +496,40 @@ async def delete_duplicate_credentials(
                 token = decrypt_credential(c.refresh_token)
                 token_key = token[:50] if token else None
                 if token_key:
-                    token_groups[token_key].append(c.id)
+                    token_groups[token_key].append(c)
             except:
                 pass
     
-    # 找出需要删除的ID（保留每组第一个，删除其他）
+    def select_best_credential(creds):
+        """选择最佳凭证：优先有效的，其次最早的"""
+        # 分离有效和无效凭证
+        active_creds = [c for c in creds if c.is_active]
+        if active_creds:
+            # 有有效凭证，保留最早的有效凭证
+            return active_creds[0].id
+        else:
+            # 都无效，保留最早的
+            return creds[0].id
+    
+    # 找出需要删除的ID
     ids_to_delete = set()
+    ids_to_keep = set()
     
-    for email, ids in email_groups.items():
-        if len(ids) > 1:
-            # 保留第一个（最早），删除其他
-            ids_to_delete.update(ids[1:])
+    for email, creds in email_groups.items():
+        if len(creds) > 1:
+            keep_id = select_best_credential(creds)
+            ids_to_keep.add(keep_id)
+            for c in creds:
+                if c.id != keep_id:
+                    ids_to_delete.add(c.id)
     
-    for token_key, ids in token_groups.items():
-        if len(ids) > 1:
-            ids_to_delete.update(ids[1:])
+    for token_key, creds in token_groups.items():
+        if len(creds) > 1:
+            keep_id = select_best_credential(creds)
+            ids_to_keep.add(keep_id)
+            for c in creds:
+                if c.id != keep_id and c.id not in ids_to_keep:
+                    ids_to_delete.add(c.id)
     
     if not ids_to_delete:
         return {"deleted_count": 0, "message": "没有需要删除的重复凭证"}
