@@ -323,45 +323,54 @@ async def export_all_credentials(
     """导出所有凭证（包含 refresh_token，解密后导出）"""
     from app.services.crypto import decrypt_credential
     
-    # 关联查询用户名
-    result = await db.execute(
-        select(Credential, User.username)
-        .outerjoin(User, Credential.user_id == User.id)
-        .order_by(Credential.created_at.desc())
-    )
-    rows = result.all()
+    try:
+        # 关联查询用户名
+        result = await db.execute(
+            select(Credential, User.username)
+            .outerjoin(User, Credential.user_id == User.id)
+            .order_by(Credential.created_at.desc())
+        )
+        rows = result.all()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
     
     export_data = []
     for row in rows:
-        c = row[0]  # Credential
-        username = row[1]  # username (可能为 None)
         try:
-            export_data.append({
-                "id": c.id,
-                "email": c.email,
-                "name": c.name,
-                "username": username,  # 上传者用户名
-                "refresh_token": decrypt_credential(c.refresh_token) if c.refresh_token else None,
-                "access_token": decrypt_credential(c.api_key) if c.api_key else None,
-                "client_id": decrypt_credential(c.client_id) if c.client_id else None,
-                "client_secret": decrypt_credential(c.client_secret) if c.client_secret else None,
-                "project_id": c.project_id,
-                "model_tier": c.model_tier,
-                "is_active": c.is_active,
-                "is_public": c.is_public,
-                "user_id": c.user_id,
-                "created_at": c.created_at.isoformat() if c.created_at else None
-            })
-        except Exception as e:
-            # 单条凭证解密失败不影响其他
-            export_data.append({
-                "id": c.id,
-                "email": c.email,
-                "name": c.name,
+            c = row[0]  # Credential
+            username = row[1]  # username (可能为 None)
+            
+            # 安全获取属性，避免 AttributeError
+            cred_data = {
+                "id": getattr(c, 'id', None),
+                "email": getattr(c, 'email', None),
+                "name": getattr(c, 'name', None),
                 "username": username,
-                "error": f"解密失败: {str(e)[:50]}",
-                "is_active": c.is_active
+                "project_id": getattr(c, 'project_id', None),
+                "model_tier": getattr(c, 'model_tier', None),
+                "is_active": getattr(c, 'is_active', None),
+                "is_public": getattr(c, 'is_public', None),
+                "user_id": getattr(c, 'user_id', None),
+                "created_at": c.created_at.isoformat() if getattr(c, 'created_at', None) else None
+            }
+            
+            # 解密敏感字段
+            try:
+                cred_data["refresh_token"] = decrypt_credential(c.refresh_token) if getattr(c, 'refresh_token', None) else None
+                cred_data["access_token"] = decrypt_credential(c.api_key) if getattr(c, 'api_key', None) else None
+                cred_data["client_id"] = decrypt_credential(c.client_id) if getattr(c, 'client_id', None) else None
+                cred_data["client_secret"] = decrypt_credential(c.client_secret) if getattr(c, 'client_secret', None) else None
+            except Exception as decrypt_err:
+                cred_data["decrypt_error"] = str(decrypt_err)[:100]
+            
+            export_data.append(cred_data)
+        except Exception as e:
+            # 单条凭证处理失败不影响其他
+            export_data.append({
+                "error": f"处理失败: {str(e)[:100]}",
+                "row_index": rows.index(row)
             })
+    
     return export_data
 
 
