@@ -894,6 +894,11 @@ export default function Admin() {
                             <span className={log.status_code === 200 ? 'text-green-400' : 'text-red-400'}>
                               {log.status_code}
                             </span>
+                            {log.cd_seconds && (
+                              <span className="ml-1 text-xs px-1 bg-orange-500/20 text-orange-400 rounded">
+                                CD:{log.cd_seconds}s
+                              </span>
+                            )}
                           </td>
                           <td className="text-gray-400">{log.latency_ms?.toFixed(0)}ms</td>
                         </tr>

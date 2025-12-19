@@ -629,6 +629,7 @@ async def get_logs(
                 "endpoint": log.UsageLog.endpoint,
                 "status_code": log.UsageLog.status_code,
                 "latency_ms": log.UsageLog.latency_ms,
+                "cd_seconds": log.UsageLog.cd_seconds,
                 "created_at": log.UsageLog.created_at.isoformat() + "Z"  # 标记为 UTC 时间
             }
             for log in logs

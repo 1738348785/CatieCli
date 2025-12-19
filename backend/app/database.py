@@ -70,6 +70,7 @@ async def init_db():
                 "ALTER TABLE credentials ADD COLUMN last_used_flash DATETIME",
                 "ALTER TABLE credentials ADD COLUMN last_used_pro DATETIME",
                 "ALTER TABLE credentials ADD COLUMN last_used_30 DATETIME",
+                "ALTER TABLE usage_logs ADD COLUMN cd_seconds INTEGER",
             ]
         else:
             # PostgreSQL 迁移（使用 IF NOT EXISTS 语法）
@@ -85,6 +86,7 @@ async def init_db():
                 "ALTER TABLE credentials ADD COLUMN IF NOT EXISTS last_used_flash TIMESTAMP",
                 "ALTER TABLE credentials ADD COLUMN IF NOT EXISTS last_used_pro TIMESTAMP",
                 "ALTER TABLE credentials ADD COLUMN IF NOT EXISTS last_used_30 TIMESTAMP",
+                "ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS cd_seconds INTEGER",
             ]
         
         for sql in migrations:

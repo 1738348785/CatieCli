@@ -450,11 +450,14 @@ class CredentialPool:
         model: str,
         error_text: str,
         headers: dict = None
-    ):
+    ) -> int:
         """
         处理 429 速率限制错误：
         1. 解析 Google 返回的 CD 时间
         2. 设置凭证对应模型组的 CD 时间
+        
+        Returns:
+            CD 秒数
         """
         # 解析 CD 时间
         cd_seconds = CredentialPool.parse_429_retry_after(error_text, headers)
@@ -500,6 +503,8 @@ class CredentialPool:
             
             await db.commit()
             print(f"[429 CD] 凭证 {credential_id} 模型组 {model_group} 设置 CD {cd_seconds}s", flush=True)
+        
+        return cd_seconds
     
     @staticmethod
     async def get_all_credentials(db: AsyncSession):

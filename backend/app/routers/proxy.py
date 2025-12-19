@@ -550,9 +550,9 @@ async def gemini_generate_content(
     print(f"[Gemini API] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
     
     # 记录日志
-    async def log_usage(status_code: int = 200):
+    async def log_usage(status_code: int = 200, cd_seconds: int = None):
         latency = (time.time() - start_time) * 1000
-        log = UsageLog(user_id=user.id, credential_id=credential.id, model=model, endpoint="/v1beta/generateContent", status_code=status_code, latency_ms=latency)
+        log = UsageLog(user_id=user.id, credential_id=credential.id, model=model, endpoint="/v1beta/generateContent", status_code=status_code, latency_ms=latency, cd_seconds=cd_seconds)
         db.add(log)
         credential.total_requests = (credential.total_requests or 0) + 1
         credential.last_used_at = datetime.utcnow()
@@ -591,10 +591,12 @@ async def gemini_generate_content(
                     await CredentialPool.handle_credential_failure(db, credential.id, f"API Error {response.status_code}: {error_text}")
                 # 429 错误解析 Google 返回的 CD 时间
                 elif response.status_code == 429:
-                    await CredentialPool.handle_429_rate_limit(
+                    cd_sec = await CredentialPool.handle_429_rate_limit(
                         db, credential.id, model, error_text, dict(response.headers)
                     )
-                await log_usage(response.status_code)
+                    await log_usage(response.status_code, cd_seconds=cd_sec)
+                else:
+                    await log_usage(response.status_code)
                 raise HTTPException(status_code=response.status_code, detail=response.text)
             
             await log_usage()
@@ -675,9 +677,9 @@ async def gemini_stream_generate_content(
     print(f"[Gemini Stream] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
     
     # 记录日志
-    async def log_usage(status_code: int = 200):
+    async def log_usage(status_code: int = 200, cd_seconds: int = None):
         latency = (time.time() - start_time) * 1000
-        log = UsageLog(user_id=user.id, credential_id=credential.id, model=model, endpoint="/v1beta/streamGenerateContent", status_code=status_code, latency_ms=latency)
+        log = UsageLog(user_id=user.id, credential_id=credential.id, model=model, endpoint="/v1beta/streamGenerateContent", status_code=status_code, latency_ms=latency, cd_seconds=cd_seconds)
         db.add(log)
         credential.total_requests = (credential.total_requests or 0) + 1
         credential.last_used_at = datetime.utcnow()
@@ -716,9 +718,10 @@ async def gemini_stream_generate_content(
                             await CredentialPool.handle_credential_failure(db, credential.id, f"API Error {response.status_code}: {error_text}")
                         # 429 错误解析 Google 返回的 CD 时间
                         elif response.status_code == 429:
-                            await CredentialPool.handle_429_rate_limit(
+                            cd_sec = await CredentialPool.handle_429_rate_limit(
                                 db, credential.id, model, error_text, dict(response.headers)
                             )
+                            await log_usage(response.status_code, cd_seconds=cd_sec)
                         yield f"data: {json.dumps({'error': error.decode()})}\n\n"
                         return
                     

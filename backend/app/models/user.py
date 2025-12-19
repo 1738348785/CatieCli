@@ -66,6 +66,7 @@ class UsageLog(Base):
     tokens_output = Column(Integer, default=0)
     status_code = Column(Integer, nullable=True)
     latency_ms = Column(Float, nullable=True)
+    cd_seconds = Column(Integer, nullable=True)  # 429 时设置的 CD 秒数
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关系
