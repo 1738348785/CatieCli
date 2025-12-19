@@ -750,11 +750,21 @@ export default function Admin() {
                             {c.failed_requests}
                           </td>
                           <td>
-                            {c.is_active ? (
-                              <span className="text-green-400">活跃</span>
-                            ) : (
-                              <span className="text-red-400">禁用</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              {c.is_active ? (
+                                <span className="text-green-400">活跃</span>
+                              ) : (
+                                <span className="text-red-400">禁用</span>
+                              )}
+                              {/* CD 状态 */}
+                              {(c.cd_flash > 0 || c.cd_pro > 0 || c.cd_30 > 0) && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {c.cd_flash > 0 && <span className="text-xs px-1 bg-cyan-500/20 text-cyan-400 rounded">F:{c.cd_flash}s</span>}
+                                  {c.cd_pro > 0 && <span className="text-xs px-1 bg-orange-500/20 text-orange-400 rounded">P:{c.cd_pro}s</span>}
+                                  {c.cd_30 > 0 && <span className="text-xs px-1 bg-pink-500/20 text-pink-400 rounded">3:{c.cd_30}s</span>}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="text-xs text-gray-500 max-w-xs truncate">
                             {c.last_error || '-'}
