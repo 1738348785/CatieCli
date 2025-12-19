@@ -94,6 +94,24 @@ export default function Admin() {
     fetchData()
   }, [tab])
 
+  // CD 实时倒计时
+  useEffect(() => {
+    if (tab !== 'credentials') return
+    const hasCD = credentials.some(c => c.cd_flash > 0 || c.cd_pro > 0 || c.cd_30 > 0)
+    if (!hasCD) return
+    
+    const timer = setInterval(() => {
+      setCredentials(prev => prev.map(c => ({
+        ...c,
+        cd_flash: Math.max(0, (c.cd_flash || 0) - 1),
+        cd_pro: Math.max(0, (c.cd_pro || 0) - 1),
+        cd_30: Math.max(0, (c.cd_30 || 0) - 1)
+      })))
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [tab, credentials.length])
+
   // 用户操作
   const toggleUserActive = async (userId, isActive) => {
     try {
