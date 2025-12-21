@@ -167,15 +167,30 @@ export default function Admin() {
   }
 
   const deleteUser = (userId) => {
-    showConfirm('删除用户', '确定删除此用户？此操作不可恢复！', async () => {
+    showConfirm('删除用户', '确定删除此用户？此操作不可恢复！\n\n注意：将同时删除该用户的所有凭证！', async () => {
       try {
         await api.delete(`/api/admin/users/${userId}`)
         fetchData()
-        showAlert('成功', '用户已删除', 'success')
+        showAlert('成功', '用户已删除（关联凭证已同时删除）', 'success')
       } catch (err) {
         showAlert('删除失败', err.response?.data?.detail || '删除用户失败', 'error')
       }
     }, true)
+  }
+
+  const resetUserPassword = (userId, username) => {
+    showInput('重置密码', `为用户 ${username} 设置新密码`, '', async (newPassword) => {
+      if (!newPassword || newPassword.length < 6) {
+        showAlert('错误', '密码长度至少6位', 'error')
+        return
+      }
+      try {
+        await api.put(`/api/admin/users/${userId}/password`, { new_password: newPassword })
+        showAlert('成功', `用户 ${username} 的密码已重置`, 'success')
+      } catch (err) {
+        showAlert('重置失败', err.response?.data?.detail || '密码重置失败', 'error')
+      }
+    })
   }
 
   // 凭证操作
@@ -614,6 +629,13 @@ export default function Admin() {
                               title={u.is_active ? '禁用' : '启用'}
                             >
                               {u.is_active ? <X size={16} /> : <Check size={16} />}
+                            </button>
+                            <button
+                              onClick={() => resetUserPassword(u.id, u.username)}
+                              className="p-1.5 rounded hover:bg-dark-700 text-gray-400 hover:text-blue-400"
+                              title="重置密码"
+                            >
+                              <Key size={16} />
                             </button>
                             <button
                               onClick={() => deleteUser(u.id)}

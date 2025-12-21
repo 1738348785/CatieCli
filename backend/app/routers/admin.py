@@ -24,6 +24,10 @@ class UserUpdate(BaseModel):
     quota_30pro: Optional[int] = None
 
 
+class UserPasswordUpdate(BaseModel):
+    new_password: str
+
+
 @router.get("/users")
 async def list_users(
     admin: User = Depends(get_current_admin),
@@ -161,7 +165,7 @@ async def delete_user(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """删除用户"""
+    """删除用户（同时删除其关联的凭证）"""
     if user_id == admin.id:
         raise HTTPException(status_code=400, detail="不能删除自己")
     
@@ -170,10 +174,45 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
+    # 先删除用户的凭证（解除使用记录的外键引用）
+    user_cred_result = await db.execute(
+        select(Credential.id).where(Credential.user_id == user_id)
+    )
+    user_cred_ids = [row[0] for row in user_cred_result.fetchall()]
+    if user_cred_ids:
+        await db.execute(
+            update(UsageLog).where(UsageLog.credential_id.in_(user_cred_ids)).values(credential_id=None)
+        )
+        await db.execute(
+            delete(Credential).where(Credential.user_id == user_id)
+        )
+    
     await db.delete(user)
     await db.commit()
     await notify_user_update()
-    return {"message": "删除成功"}
+    await notify_credential_update()
+    return {"message": "删除成功（已同时删除关联凭证）"}
+
+
+@router.put("/users/{user_id}/password")
+async def update_user_password(
+    user_id: int,
+    data: UserPasswordUpdate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """管理员修改用户密码"""
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="密码长度至少6位")
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    user.hashed_password = get_password_hash(data.new_password)
+    await db.commit()
+    return {"message": f"用户 {user.username} 的密码已重置"}
 
 
 # ===== 凭证管理 =====
