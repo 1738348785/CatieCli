@@ -1,127 +1,246 @@
-sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no active connection
-[SQL: SELECT count(usage_logs.id) AS count_1 
-FROM usage_logs 
-WHERE usage_logs.user_id = ? AND usage_logs.created_at >= ? AND usage_logs.model LIKE ?]
-[parameters: (2, '2025-12-18 07:00:00.000000', '%3%')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-INFO:     103.193.148.166:55334 - "GET /api/auth/me HTTP/1.1" 500 Internal Server Error
-INFO:     103.193.148.166:55348 - "POST /v1/chat/completions HTTP/1.1" 500 Internal Server Error
-ERROR:    Exception in ASGI application
-Traceback (most recent call last):
-  File "/usr/local/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 409, in run_asgi
-    result = await app(  # type: ignore[func-returns-value]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
-    return await self.app(scope, receive, send)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/fastapi/applications.py", line 1139, in __call__
-    await super().__call__(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/applications.py", line 107, in __call__
-    await self.middleware_stack(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
-    raise exc
-  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
-    await self.app(scope, receive, _send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
-    await self.app(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
-    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
-    raise exc
-  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
-    await app(scope, receive, sender)
-  File "/usr/local/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
-    await self.app(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 716, in __call__
-    await self.middleware_stack(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 736, in app
-    await route.handle(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 290, in handle
-    await self.app(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 120, in app
-    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
-  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
-    raise exc
-  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
-    await app(scope, receive, sender)
-  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 106, in app
-    response = await f(request)
-               ^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 420, in app
-    solved_result = await solve_dependencies(
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/fastapi/dependencies/utils.py", line 674, in solve_dependencies
-    solved = await call(**solved_result.values)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/app/routers/proxy.py", line 45, in get_user_from_api_key
-    user = await get_user_by_api_key(db, api_key)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/app/services/auth.py", line 39, in get_user_by_api_key
-    result = await db.execute(
-             ^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
-    result = await greenlet_spawn(
-             ^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
-    result = context.throw(*sys.exc_info())
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
-    return self._execute_internal(
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
-    conn = self._connection_for_bind(bind)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
-    return trans._connection_for_bind(engine, execution_options)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "<string>", line 2, in _connection_for_bind
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
-    ret_value = fn(self, *arg, **kw)
-                ^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
-    conn = bind.connect()
-           ^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
-    return self._connection_cls(self)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
-    self._dbapi_connection = engine.raw_connection()
-                             ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
-    return self.pool.connect()
-           ^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 447, in connect
-    return _ConnectionFairy._checkout(self)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 1363, in _checkout
-    with util.safe_reraise():
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
-    raise exc_value.with_traceback(exc_tb)
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 1301, in _checkout
-    result = pool._dialect._do_ping_w_event(
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 729, in _do_ping_w_event
-    return self.do_ping(dbapi_connection)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 753, in do_ping
-    cursor.execute(self._dialect_specific_select_one)
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 180, in execute
-    self._adapt_connection._handle_exception(error)
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 340, in _handle_exception
-    raise error
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py", line 160, in execute
-    self.await_(_cursor.execute(operation))
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
-    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
-    value = await result
-            ^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/aiosqlite/cursor.py", line 40, in execute
-    await self._execute(self._cursor.execute, sql, parameters)
-  File "/usr/local/lib/python3.11/site-packages/aiosqlite/cursor.py", line 32, in _execute
-    return await self._conn._execute(fn, *args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/aiosqlite/core.py", line 115, in _execute
-    raise ValueError("Connection closed")
-ValueError: Connection closed
+async def fetch_project_id(
+    access_token: str,
+    user_agent: str,
+    api_base_url: str
+) -> Optional[str]:
+    """
+    从 API 获取 project_id，如果 loadCodeAssist 失败则回退到 onboardUser
+
+    Args:
+        access_token: Google OAuth access token
+        user_agent: User-Agent header
+        api_base_url: API base URL (e.g., antigravity or code assist endpoint)
+
+    Returns:
+        project_id 字符串，如果获取失败返回 None
+    """
+    headers = {
+        'User-Agent': user_agent,
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+        'Accept-Encoding': 'gzip'
+    }
+
+    # 步骤 1: 尝试 loadCodeAssist
+    try:
+        project_id = await _try_load_code_assist(api_base_url, headers)
+        if project_id:
+            return project_id
+
+        log.warning("[fetch_project_id] loadCodeAssist did not return project_id, falling back to onboardUser")
+
+    except Exception as e:
+        log.warning(f"[fetch_project_id] loadCodeAssist failed: {type(e).__name__}: {e}")
+        log.warning("[fetch_project_id] Falling back to onboardUser")
+
+    # 步骤 2: 回退到 onboardUser
+    try:
+        project_id = await _try_onboard_user(api_base_url, headers)
+        if project_id:
+            return project_id
+
+        log.error("[fetch_project_id] Failed to get project_id from both loadCodeAssist and onboardUser")
+        return None
+
+    except Exception as e:
+        log.error(f"[fetch_project_id] onboardUser failed: {type(e).__name__}: {e}")
+        import traceback
+        log.debug(f"[fetch_project_id] Traceback: {traceback.format_exc()}")
+        return None
+
+
+async def _try_load_code_assist(
+    api_base_url: str,
+    headers: dict
+) -> Optional[str]:
+    """
+    尝试通过 loadCodeAssist 获取 project_id
+
+    Returns:
+        project_id 或 None
+    """
+    request_url = f"{api_base_url.rstrip('/')}/v1internal:loadCodeAssist"
+    request_body = {
+        "metadata": {
+            "ideType": "ANTIGRAVITY",
+            "platform": "PLATFORM_UNSPECIFIED",
+            "pluginType": "GEMINI"
+        }
+    }
+
+    log.debug(f"[loadCodeAssist] Fetching project_id from: {request_url}")
+    log.debug(f"[loadCodeAssist] Request body: {request_body}")
+
+    response = await post_async(
+        request_url,
+        json=request_body,
+        headers=headers,
+        timeout=30.0,
+    )
+
+    log.debug(f"[loadCodeAssist] Response status: {response.status_code}")
+
+    if response.status_code == 200:
+        response_text = response.text
+        log.debug(f"[loadCodeAssist] Response body: {response_text}")
+
+        data = response.json()
+        log.debug(f"[loadCodeAssist] Response JSON keys: {list(data.keys())}")
+
+        # 检查是否有 currentTier（表示用户已激活）
+        current_tier = data.get("currentTier")
+        if current_tier:
+            log.info("[loadCodeAssist] User is already activated")
+
+            # 使用服务器返回的 project_id
+            project_id = data.get("cloudaicompanionProject")
+            if project_id:
+                log.info(f"[loadCodeAssist] Successfully fetched project_id: {project_id}")
+                return project_id
+
+            log.warning("[loadCodeAssist] No project_id in response")
+            return None
+        else:
+            log.info("[loadCodeAssist] User not activated yet (no currentTier)")
+            return None
+    else:
+        log.warning(f"[loadCodeAssist] Failed: HTTP {response.status_code}")
+        log.warning(f"[loadCodeAssist] Response body: {response.text[:500]}")
+        raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
+
+
+async def _try_onboard_user(
+    api_base_url: str,
+    headers: dict
+) -> Optional[str]:
+    """
+    尝试通过 onboardUser 获取 project_id（长时间运行操作，需要轮询）
+
+    Returns:
+        project_id 或 None
+    """
+    request_url = f"{api_base_url.rstrip('/')}/v1internal:onboardUser"
+
+    # 首先需要获取用户的 tier 信息
+    tier_id = await _get_onboard_tier(api_base_url, headers)
+    if not tier_id:
+        log.error("[onboardUser] Failed to determine user tier")
+        return None
+
+    log.info(f"[onboardUser] User tier: {tier_id}")
+
+    # 构造 onboardUser 请求
+    # 注意：FREE tier 不应该包含 cloudaicompanionProject
+    request_body = {
+        "tierId": tier_id,
+        "metadata": {
+            "ideType": "ANTIGRAVITY",
+            "platform": "PLATFORM_UNSPECIFIED",
+            "pluginType": "GEMINI"
+        }
+    }
+
+    log.debug(f"[onboardUser] Request URL: {request_url}")
+    log.debug(f"[onboardUser] Request body: {request_body}")
+
+    # onboardUser 是长时间运行操作，需要轮询
+    # 最多等待 10 秒（5 次 * 2 秒）
+    max_attempts = 5
+    attempt = 0
+
+    while attempt < max_attempts:
+        attempt += 1
+        log.debug(f"[onboardUser] Polling attempt {attempt}/{max_attempts}")
+
+        response = await post_async(
+            request_url,
+            json=request_body,
+            headers=headers,
+            timeout=30.0,
+        )
+
+        log.debug(f"[onboardUser] Response status: {response.status_code}")
+
+        if response.status_code == 200:
+            data = response.json()
+            log.debug(f"[onboardUser] Response data: {data}")
+
+            # 检查长时间运行操作是否完成
+            if data.get("done"):
+                log.info("[onboardUser] Operation completed")
+
+                # 从响应中提取 project_id
+                response_data = data.get("response", {})
+                project_obj = response_data.get("cloudaicompanionProject", {})
+
+                if isinstance(project_obj, dict):
+                    project_id = project_obj.get("id")
+                elif isinstance(project_obj, str):
+                    project_id = project_obj
+                else:
+                    project_id = None
+
+                if project_id:
+                    log.info(f"[onboardUser] Successfully fetched project_id: {project_id}")
+                    return project_id
+                else:
+                    log.warning("[onboardUser] Operation completed but no project_id in response")
+                    return None
+            else:
+                log.debug("[onboardUser] Operation still in progress, waiting 2 seconds...")
+                await asyncio.sleep(2)
+        else:
+            log.warning(f"[onboardUser] Failed: HTTP {response.status_code}")
+            log.warning(f"[onboardUser] Response body: {response.text[:500]}")
+            raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
+
+    log.error("[onboardUser] Timeout: Operation did not complete within 10 seconds")
+    return None
+
+
+async def _get_onboard_tier(
+    api_base_url: str,
+    headers: dict
+) -> Optional[str]:
+    """
+    从 loadCodeAssist 响应中获取用户应该注册的 tier
+
+    Returns:
+        tier_id (如 "FREE", "STANDARD", "LEGACY") 或 None
+    """
+    request_url = f"{api_base_url.rstrip('/')}/v1internal:loadCodeAssist"
+    request_body = {
+        "metadata": {
+            "ideType": "ANTIGRAVITY",
+            "platform": "PLATFORM_UNSPECIFIED",
+            "pluginType": "GEMINI"
+        }
+    }
+
+    log.debug(f"[_get_onboard_tier] Fetching tier info from: {request_url}")
+
+    response = await post_async(
+        request_url,
+        json=request_body,
+        headers=headers,
+        timeout=30.0,
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        log.debug(f"[_get_onboard_tier] Response data: {data}")
+
+        # 查找默认的 tier
+        allowed_tiers = data.get("allowedTiers", [])
+        for tier in allowed_tiers:
+            if tier.get("isDefault"):
+                tier_id = tier.get("id")
+                log.info(f"[_get_onboard_tier] Found default tier: {tier_id}")
+                return tier_id
+
+        # 如果没有默认 tier，使用 LEGACY 作为回退
+        log.warning("[_get_onboard_tier] No default tier found, using LEGACY")
+        return "LEGACY"
+    else:
+        log.error(f"[_get_onboard_tier] Failed to fetch tier info: HTTP {response.status_code}")
+        return None

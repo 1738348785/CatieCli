@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.user import User, Credential
 from app.services.auth import get_current_user, get_current_admin
 from app.config import settings
+from app.services.credential_pool import fetch_project_id
 
 router = APIRouter(prefix="/api/oauth", tags=["OAuth认证"])
 
@@ -234,29 +235,49 @@ async def credential_from_callback_url(
         
         email = userinfo.get("email", "unknown")
         
-        # 获取用户的 Google Cloud 项目列表
+        # 使用新的 fetch_project_id 方法获取 project_id（sukaka 提供）
         project_id = ""
         try:
-            async with httpx.AsyncClient() as client:
-                projects_response = await client.get(
-                    "https://cloudresourcemanager.googleapis.com/v1/projects",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    params={"filter": "lifecycleState:ACTIVE"}
-                )
-                projects_data = projects_response.json()
-                projects = projects_data.get("projects", [])
-                
-                if projects:
-                    # 选择第一个项目，或者找 default 项目
-                    for p in projects:
-                        if "default" in p.get("projectId", "").lower() or "default" in p.get("name", "").lower():
-                            project_id = p.get("projectId")
-                            break
-                    if not project_id:
-                        project_id = projects[0].get("projectId", "")
-                    print(f"获取到 project_id: {project_id}", flush=True)
+            # 优先使用 loadCodeAssist/onboardUser 方法获取 project_id
+            project_id = await fetch_project_id(
+                access_token=access_token,
+                user_agent="CatieCli/1.0",
+                api_base_url="https://cloudcode-pa.googleapis.com"
+            )
+            if project_id:
+                print(f"[fetch_project_id] ✅ 获取到 project_id: {project_id}", flush=True)
+        except Exception as e:
+            print(f"[fetch_project_id] ⚠️ 获取失败: {e}", flush=True)
+        
+        # 如果新方法失败，回退到 Cloud Resource Manager API
+        if not project_id:
+            print(f"[project_id] 回退到 Cloud Resource Manager API...", flush=True)
+            try:
+                async with httpx.AsyncClient() as client:
+                    projects_response = await client.get(
+                        "https://cloudresourcemanager.googleapis.com/v1/projects",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                        params={"filter": "lifecycleState:ACTIVE"}
+                    )
+                    projects_data = projects_response.json()
+                    projects = projects_data.get("projects", [])
                     
-                    # 自动启用必需的 API 服务
+                    if projects:
+                        # 选择第一个项目，或者找 default 项目
+                        for p in projects:
+                            if "default" in p.get("projectId", "").lower() or "default" in p.get("name", "").lower():
+                                project_id = p.get("projectId")
+                                break
+                        if not project_id:
+                            project_id = projects[0].get("projectId", "")
+                        print(f"[Cloud Resource Manager] 获取到 project_id: {project_id}", flush=True)
+            except Exception as e:
+                print(f"[Cloud Resource Manager] 获取项目列表失败: {e}", flush=True)
+        
+        # 如果获取到了 project_id，尝试启用必需的 API 服务
+        if project_id:
+            try:
+                async with httpx.AsyncClient() as client:
                     required_services = [
                         "geminicloudassist.googleapis.com",
                         "cloudaicompanion.googleapis.com",
@@ -275,8 +296,8 @@ async def credential_from_callback_url(
                                 print(f"⚠️ 启用服务 {service}: {enable_response.status_code}", flush=True)
                         except Exception as se:
                             print(f"启用服务 {service} 失败: {se}", flush=True)
-        except Exception as e:
-            print(f"获取项目列表失败: {e}", flush=True)
+            except Exception as e:
+                print(f"启用服务失败: {e}", flush=True)
         
         # 检查是否已存在相同邮箱的凭证（去重）
         from sqlalchemy import select
@@ -472,27 +493,47 @@ async def credential_from_callback_url_discord(
         
         email = userinfo.get("email", "unknown")
         
-        # 获取项目 ID
+        # 使用新的 fetch_project_id 方法获取 project_id（sukaka 提供）
         project_id = ""
         try:
-            async with httpx.AsyncClient() as client:
-                projects_response = await client.get(
-                    "https://cloudresourcemanager.googleapis.com/v1/projects",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    params={"filter": "lifecycleState:ACTIVE"}
-                )
-                projects_data = projects_response.json()
-                projects = projects_data.get("projects", [])
-                
-                if projects:
-                    for p in projects:
-                        if "default" in p.get("projectId", "").lower():
-                            project_id = p.get("projectId")
-                            break
-                    if not project_id:
-                        project_id = projects[0].get("projectId", "")
+            project_id = await fetch_project_id(
+                access_token=access_token,
+                user_agent="CatieCli-Discord/1.0",
+                api_base_url="https://cloudcode-pa.googleapis.com"
+            )
+            if project_id:
+                print(f"[Discord OAuth] [fetch_project_id] ✅ 获取到 project_id: {project_id}", flush=True)
+        except Exception as e:
+            print(f"[Discord OAuth] [fetch_project_id] ⚠️ 获取失败: {e}", flush=True)
+        
+        # 如果新方法失败，回退到 Cloud Resource Manager API
+        if not project_id:
+            print(f"[Discord OAuth] 回退到 Cloud Resource Manager API...", flush=True)
+            try:
+                async with httpx.AsyncClient() as client:
+                    projects_response = await client.get(
+                        "https://cloudresourcemanager.googleapis.com/v1/projects",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                        params={"filter": "lifecycleState:ACTIVE"}
+                    )
+                    projects_data = projects_response.json()
+                    projects = projects_data.get("projects", [])
                     
-                    # 启用必需服务
+                    if projects:
+                        for p in projects:
+                            if "default" in p.get("projectId", "").lower():
+                                project_id = p.get("projectId")
+                                break
+                        if not project_id:
+                            project_id = projects[0].get("projectId", "")
+                        print(f"[Discord OAuth] [Cloud Resource Manager] 获取到 project_id: {project_id}", flush=True)
+            except Exception as e:
+                print(f"[Discord OAuth] [Cloud Resource Manager] 获取项目失败: {e}", flush=True)
+        
+        # 如果获取到了 project_id，尝试启用必需的 API 服务
+        if project_id:
+            try:
+                async with httpx.AsyncClient() as client:
                     for service in ["geminicloudassist.googleapis.com", "cloudaicompanion.googleapis.com"]:
                         try:
                             await client.post(
@@ -502,8 +543,8 @@ async def credential_from_callback_url_discord(
                             )
                         except:
                             pass
-        except Exception as e:
-            print(f"[Discord OAuth] 获取项目失败: {e}", flush=True)
+            except Exception as e:
+                print(f"[Discord OAuth] 启用服务失败: {e}", flush=True)
         
         # 检查是否已存在相同邮箱的凭证（去重）
         from sqlalchemy import select
