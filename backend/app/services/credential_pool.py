@@ -761,6 +761,10 @@ class CredentialPool:
             else:
                 cred.last_used_flash = last_used
             
+            # 记录错误信息到 last_error（截取前 500 字符以保持简洁）
+            cred.last_error = f"429限速 CD {cd_seconds}秒 ({model_group}) - {error_text[:300] if error_text else ''}"
+            cred.failed_requests = (cred.failed_requests or 0) + 1
+            
             await db.commit()
             print(f"[429 CD] 凭证 {credential_id} 模型组 {model_group} 设置 CD {cd_seconds}s", flush=True)
         
