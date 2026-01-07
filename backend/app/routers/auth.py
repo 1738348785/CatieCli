@@ -583,6 +583,8 @@ async def list_my_credentials(user: User = Depends(get_current_user), db: AsyncS
             "model_tier": c.model_tier or "2.5",
             "account_type": c.account_type or "free",
             "total_requests": c.total_requests or 0,
+            "failed_requests": c.failed_requests or 0,
+            "last_error": c.last_error,
             "last_used_at": (c.last_used_at.isoformat() + "Z") if c.last_used_at else None,
             "created_at": (c.created_at.isoformat() + "Z") if c.created_at else None,
             "cd_flash": get_cd_remaining(c.last_used_flash, settings.cd_flash),
