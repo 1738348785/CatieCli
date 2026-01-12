@@ -57,7 +57,7 @@ class GeminiClient:
         # 使用更细粒度的超时配置，避免长时间生成时连接中断
         timeout = httpx.Timeout(
             connect=30.0,    # 连接超时
-            read=180.0,      # 读取超时（等待响应）
+            read=600.0,      # 读取超时（等待响应）
             write=30.0,      # 写入超时
             pool=30.0        # 连接池超时
         )
@@ -419,10 +419,11 @@ class GeminiClient:
             return {"thinkingConfig": {"thinkingBudget": 32768, "includeThoughts": True}}
         # 显式指定 nothinking
         elif "-nothinking" in model:
-            # pro 模型最低 thinkingBudget 为 128
-            if "pro" in model:
-                return {"thinkingConfig": {"thinkingBudget": 128}}
-            return {"thinkingConfig": {"thinkingBudget": 0}}
+            # flash 模型可以用 0，pro 模型最低 128
+            if "flash" in model:
+                return {"thinkingConfig": {"thinkingBudget": 0}}
+            # pro/gemini-3 等高级模型最低 128
+            return {"thinkingConfig": {"thinkingBudget": 128}}
         # gemini-3-pro-preview 默认需要 thinkingBudget
         elif "gemini-3" in model:
             return {"thinkingConfig": {"thinkingBudget": 8192, "includeThoughts": True}}
