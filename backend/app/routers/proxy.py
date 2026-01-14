@@ -670,7 +670,8 @@ async def gemini_generate_content(
     user: User = Depends(get_user_from_api_key),
     db: AsyncSession = Depends(get_db)
 ):
-    """Gemini 原生 generateContent 接口"""
+    """Gemini 原生 generateContent 接口（带重试功能）"""
+    import httpx
     start_time = time.time()
     
     try:
@@ -703,123 +704,220 @@ async def gemini_generate_content(
         if current_rpm >= max_rpm:
             raise HTTPException(status_code=429, detail=f"速率限制: {max_rpm} 次/分钟")
     
-    # 获取凭证
-    credential = await CredentialPool.get_available_credential(
-        db, user_id=user.id, user_has_public_creds=user_has_public, model=model
-    )
-    if not credential:
-        raise HTTPException(status_code=503, detail="暂无可用凭证")
+    # 构建请求体（只构建一次）
+    url = "https://cloudcode-pa.googleapis.com/v1internal:generateContent"
+    request_body = {"contents": contents}
+    if "generationConfig" in body:
+        gen_config = body["generationConfig"].copy() if isinstance(body["generationConfig"], dict) else body["generationConfig"]
+        # 防呆设计：topK 有效范围为 1-64
+        if isinstance(gen_config, dict) and "topK" in gen_config:
+            if gen_config["topK"] is not None and (gen_config["topK"] < 1 or gen_config["topK"] > 64):
+                print(f"[Gemini API] ⚠️ topK={gen_config['topK']} 超出有效范围(1-64)，已自动调整为 64", flush=True)
+                gen_config["topK"] = 64
+        # 防呆设计：maxOutputTokens 有效范围为 1-65536
+        if isinstance(gen_config, dict) and "maxOutputTokens" in gen_config:
+            if gen_config["maxOutputTokens"] is not None and (gen_config["maxOutputTokens"] < 1 or gen_config["maxOutputTokens"] > 65536):
+                print(f"[Gemini API] ⚠️ maxOutputTokens={gen_config['maxOutputTokens']} 超出有效范围(1-65536)，已自动调整为 65536", flush=True)
+                gen_config["maxOutputTokens"] = 65536
+        request_body["generationConfig"] = gen_config
+    if "systemInstruction" in body:
+        request_body["systemInstruction"] = body["systemInstruction"]
+    if "safetySettings" in body:
+        request_body["safetySettings"] = body["safetySettings"]
+    if "tools" in body:
+        request_body["tools"] = body["tools"]
     
-    access_token = await CredentialPool.get_access_token(credential, db)
-    if not access_token:
-        raise HTTPException(status_code=503, detail="凭证已失效")
+    # 重试逻辑
+    max_retries = settings.error_retry_count
+    tried_credential_ids = set()
+    last_error = None
+    credential = None
+    access_token = None
+    project_id = ""
     
-    project_id = credential.project_id or ""
-    print(f"[Gemini API] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
-    
-    # 记录日志
-    async def log_usage(status_code: int = 200, cd_seconds: int = None, error_msg: str = None):
-        latency = (time.time() - start_time) * 1000
-        
-        # 错误分类
-        error_type = None
-        error_code = None
-        if status_code != 200 and error_msg:
-            error_type, error_code = classify_error_simple(status_code, error_msg)
-        
-        log = UsageLog(
-            user_id=user.id,
-            credential_id=credential.id,
-            model=model,
-            endpoint="/v1beta/generateContent",
-            status_code=status_code,
-            latency_ms=latency,
-            cd_seconds=cd_seconds,
-            error_message=error_msg[:2000] if error_msg else None,
-            error_type=error_type,
-            error_code=error_code,
-            credential_email=credential.email if credential else None
+    for retry_attempt in range(max_retries + 1):
+        # 获取凭证
+        credential = await CredentialPool.get_available_credential(
+            db, user_id=user.id, user_has_public_creds=user_has_public, model=model,
+            exclude_ids=tried_credential_ids
         )
-        db.add(log)
-        credential.total_requests = (credential.total_requests or 0) + 1
-        credential.last_used_at = datetime.utcnow()
-        await db.commit()
-    
-    # 直接转发到 Google API
-    try:
-        import httpx
-        url = "https://cloudcode-pa.googleapis.com/v1internal:generateContent"
+        if not credential:
+            if retry_attempt == 0:
+                raise HTTPException(status_code=503, detail="暂无可用凭证")
+            break  # 无更多凭证可用，退出重试
         
-        # 构建 payload
-        request_body = {"contents": contents}
-        if "generationConfig" in body:
-            gen_config = body["generationConfig"].copy() if isinstance(body["generationConfig"], dict) else body["generationConfig"]
-            # 防呆设计：topK 有效范围为 1-64（Gemini CLI API 支持范围为 1 inclusive 到 65 exclusive）
-            # 当 topK 为 0 或无效值时，使用最大默认值 64；超过 64 时也锁定为 64
-            if isinstance(gen_config, dict) and "topK" in gen_config:
-                if gen_config["topK"] is not None and (gen_config["topK"] < 1 or gen_config["topK"] > 64):
-                    print(f"[Gemini API] ⚠️ topK={gen_config['topK']} 超出有效范围(1-64)，已自动调整为 64", flush=True)
-                    gen_config["topK"] = 64
-            # 防呆设计：maxOutputTokens 有效范围为 1-65536（API 支持范围为 1 inclusive 到 65537 exclusive）
-            if isinstance(gen_config, dict) and "maxOutputTokens" in gen_config:
-                if gen_config["maxOutputTokens"] is not None and (gen_config["maxOutputTokens"] < 1 or gen_config["maxOutputTokens"] > 65536):
-                    print(f"[Gemini API] ⚠️ maxOutputTokens={gen_config['maxOutputTokens']} 超出有效范围(1-65536)，已自动调整为 65536", flush=True)
-                    gen_config["maxOutputTokens"] = 65536
-            request_body["generationConfig"] = gen_config
-        if "systemInstruction" in body:
-            request_body["systemInstruction"] = body["systemInstruction"]
-        if "safetySettings" in body:
-            request_body["safetySettings"] = body["safetySettings"]
-        if "tools" in body:
-            request_body["tools"] = body["tools"]
+        tried_credential_ids.add(credential.id)
+        
+        access_token = await CredentialPool.get_access_token(credential, db)
+        if not access_token:
+            print(f"[Gemini API] ⚠️ 凭证 {credential.email} Token 刷新失败，尝试下一个", flush=True)
+            continue
+        
+        project_id = credential.project_id or ""
+        print(f"[Gemini API] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}" +
+              (f" (重试 {retry_attempt}/{max_retries})" if retry_attempt > 0 else ""), flush=True)
         
         payload = {"model": model, "project": project_id, "request": request_body}
         
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                url,
-                headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-                json=payload
-            )
-            
-            if response.status_code != 200:
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+                    json=payload
+                )
+                
+                if response.status_code == 200:
+                    # 成功：记录日志
+                    latency = (time.time() - start_time) * 1000
+                    log = UsageLog(
+                        user_id=user.id,
+                        credential_id=credential.id,
+                        model=model,
+                        endpoint="/v1beta/generateContent",
+                        status_code=200,
+                        latency_ms=latency,
+                        credential_email=credential.email
+                    )
+                    db.add(log)
+                    credential.total_requests = (credential.total_requests or 0) + 1
+                    credential.last_used_at = datetime.utcnow()
+                    await db.commit()
+                    
+                    # WebSocket 实时通知
+                    await notify_log_update({
+                        "username": user.username,
+                        "model": model,
+                        "status_code": 200,
+                        "latency_ms": round(latency, 0),
+                        "created_at": datetime.utcnow().isoformat()
+                    })
+                    await notify_stats_update()
+                    
+                    # 转换响应格式
+                    result = response.json()
+                    if "response" in result:
+                        standard_result = result.get("response", {})
+                        if "modelVersion" in result:
+                            standard_result["modelVersion"] = result["modelVersion"]
+                        return JSONResponse(content=standard_result)
+                    return JSONResponse(content=result)
+                
+                # 请求失败
                 error_text = response.text[:500]
+                last_error = f"API Error {response.status_code}: {error_text}"
                 print(f"[Gemini API] ❌ 错误 {response.status_code}: {error_text}", flush=True)
-                # 401/403 错误自动禁用凭证
+                
+                # 处理凭证失败
+                cd_sec = None
                 if response.status_code in [401, 403]:
-                    await CredentialPool.handle_credential_failure(db, credential.id, f"API Error {response.status_code}: {error_text}")
-                    await log_usage(response.status_code, error_msg=error_text)
-                # 429 错误解析 Google 返回的 CD 时间
+                    await CredentialPool.handle_credential_failure(db, credential.id, last_error)
                 elif response.status_code == 429:
                     cd_sec = await CredentialPool.handle_429_rate_limit(
                         db, credential.id, model, error_text, dict(response.headers)
                     )
-                    await log_usage(response.status_code, cd_seconds=cd_sec, error_msg=error_text)
-                else:
-                    await log_usage(response.status_code, error_msg=error_text)
-                raise HTTPException(status_code=response.status_code, detail=response.text)
+                
+                # ✅ 每次尝试都记录日志（包括中间的重试）
+                attempt_latency = (time.time() - start_time) * 1000
+                error_type, error_code = classify_error_simple(response.status_code, error_text)
+                log = UsageLog(
+                    user_id=user.id,
+                    credential_id=credential.id,
+                    model=model,
+                    endpoint="/v1beta/generateContent",
+                    status_code=response.status_code,
+                    latency_ms=attempt_latency,
+                    cd_seconds=cd_sec,
+                    error_message=error_text[:2000],
+                    error_type=error_type,
+                    error_code=error_code,
+                    credential_email=credential.email
+                )
+                db.add(log)
+                credential.total_requests = (credential.total_requests or 0) + 1
+                credential.last_used_at = datetime.utcnow()
+                await db.commit()
+                
+                # WebSocket 实时通知
+                await notify_log_update({
+                    "username": user.username,
+                    "model": model,
+                    "status_code": response.status_code,
+                    "error_type": error_type,
+                    "latency_ms": round(attempt_latency, 0),
+                    "created_at": datetime.utcnow().isoformat()
+                })
+                await notify_stats_update()
+                
+                # 检查是否应该重试
+                should_retry = response.status_code in [429, 500, 503, 404]
+                if should_retry and retry_attempt < max_retries:
+                    print(f"[Gemini API] 🔄 切换凭证重试 ({retry_attempt + 2}/{max_retries + 1})", flush=True)
+                    continue
+                
+                # 不重试，返回错误
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"API调用失败 (已重试 {retry_attempt + 1} 次): {response.text}"
+                )
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_str = str(e)
+            last_error = error_str
+            print(f"[Gemini API] ❌ 异常: {error_str}", flush=True)
             
-            await log_usage()
+            if credential:
+                await CredentialPool.handle_credential_failure(db, credential.id, error_str)
             
-            # 转换响应格式：从内部格式转为标准 Gemini API 格式
-            result = response.json()
-            if "response" in result:
-                # 内部 API 格式: {"response": {"candidates": [...]}, "modelVersion": "..."}
-                # 转为标准格式: {"candidates": [...], "modelVersion": "..."}
-                standard_result = result.get("response", {})
-                if "modelVersion" in result:
-                    standard_result["modelVersion"] = result["modelVersion"]
-                return JSONResponse(content=standard_result)
-            return JSONResponse(content=result)
+            # ✅ 每次尝试都记录日志（包括中间的重试）
+            status_code = extract_status_code(error_str)
+            attempt_latency = (time.time() - start_time) * 1000
+            error_type, error_code = classify_error_simple(status_code, error_str)
+            log = UsageLog(
+                user_id=user.id,
+                credential_id=credential.id if credential else None,
+                model=model,
+                endpoint="/v1beta/generateContent",
+                status_code=status_code,
+                latency_ms=attempt_latency,
+                error_message=error_str[:2000],
+                error_type=error_type,
+                error_code=error_code,
+                credential_email=credential.email if credential else None
+            )
+            db.add(log)
+            if credential:
+                credential.total_requests = (credential.total_requests or 0) + 1
+                credential.last_used_at = datetime.utcnow()
+            await db.commit()
+            
+            # WebSocket 实时通知
+            await notify_log_update({
+                "username": user.username,
+                "model": model,
+                "status_code": status_code,
+                "error_type": error_type,
+                "latency_ms": round(attempt_latency, 0),
+                "created_at": datetime.utcnow().isoformat()
+            })
+            await notify_stats_update()
+            
+            # 检查是否应该重试
+            should_retry = any(code in error_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "ECONNRESET", "ETIMEDOUT"])
+            if should_retry and retry_attempt < max_retries:
+                print(f"[Gemini API] 🔄 切换凭证重试 ({retry_attempt + 2}/{max_retries + 1})", flush=True)
+                continue
+            
+            # 不重试，返回错误
+            raise HTTPException(
+                status_code=status_code,
+                detail=f"API调用失败 (已重试 {retry_attempt + 1} 次): {error_str}"
+            )
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        error_str = str(e)
-        await CredentialPool.handle_credential_failure(db, credential.id, error_str)
-        status_code = extract_status_code(error_str)
-        await log_usage(status_code, error_msg=error_str)
-        raise HTTPException(status_code=status_code, detail=error_str)
+    # 所有重试都失败
+    raise HTTPException(status_code=503, detail=f"所有凭证都失败了: {last_error}")
 
 
 @router.post("/v1beta/models/{model:path}:streamGenerateContent")
@@ -830,7 +928,8 @@ async def gemini_stream_generate_content(
     user: User = Depends(get_user_from_api_key),
     db: AsyncSession = Depends(get_db)
 ):
-    """Gemini 原生 streamGenerateContent 接口"""
+    """Gemini 原生 streamGenerateContent 接口（带重试功能）"""
+    import httpx
     start_time = time.time()
     
     try:
@@ -863,25 +962,54 @@ async def gemini_stream_generate_content(
         if current_rpm >= max_rpm:
             raise HTTPException(status_code=429, detail=f"速率限制: {max_rpm} 次/分钟")
     
-    # 获取凭证
+    # 构建请求体（只构建一次）
+    url = "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse"
+    request_body = {"contents": contents}
+    if "generationConfig" in body:
+        gen_config = body["generationConfig"].copy() if isinstance(body["generationConfig"], dict) else body["generationConfig"]
+        # 防呆设计：topK 有效范围为 1-64
+        if isinstance(gen_config, dict) and "topK" in gen_config:
+            if gen_config["topK"] is not None and (gen_config["topK"] < 1 or gen_config["topK"] > 64):
+                print(f"[Gemini Stream] ⚠️ topK={gen_config['topK']} 超出有效范围(1-64)，已自动调整为 64", flush=True)
+                gen_config["topK"] = 64
+        # 防呆设计：maxOutputTokens 有效范围为 1-65536
+        if isinstance(gen_config, dict) and "maxOutputTokens" in gen_config:
+            if gen_config["maxOutputTokens"] is not None and (gen_config["maxOutputTokens"] < 1 or gen_config["maxOutputTokens"] > 65536):
+                print(f"[Gemini Stream] ⚠️ maxOutputTokens={gen_config['maxOutputTokens']} 超出有效范围(1-65536)，已自动调整为 65536", flush=True)
+                gen_config["maxOutputTokens"] = 65536
+        request_body["generationConfig"] = gen_config
+    if "systemInstruction" in body:
+        request_body["systemInstruction"] = body["systemInstruction"]
+    if "safetySettings" in body:
+        request_body["safetySettings"] = body["safetySettings"]
+    if "tools" in body:
+        request_body["tools"] = body["tools"]
+    
+    # 预先获取第一个凭证（使用主db）
+    max_retries = settings.error_retry_count
+    tried_credential_ids = set()
+    
     credential = await CredentialPool.get_available_credential(
-        db, user_id=user.id, user_has_public_creds=user_has_public, model=model
+        db, user_id=user.id, user_has_public_creds=user_has_public, model=model,
+        exclude_ids=tried_credential_ids
     )
     if not credential:
         raise HTTPException(status_code=503, detail="暂无可用凭证")
+    
+    tried_credential_ids.add(credential.id)
     
     access_token = await CredentialPool.get_access_token(credential, db)
     if not access_token:
         raise HTTPException(status_code=503, detail="凭证已失效")
     
     project_id = credential.project_id or ""
-    credential_id = credential.id
-    credential_email = credential.email
+    first_credential_id = credential.id
+    first_credential_email = credential.email
     user_id = user.id
     username = user.username
     print(f"[Gemini Stream] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
     
-    # ✅ 主db连接到此处结束使用，流式生成器将使用独立会话（后台任务）
+    # ✅ 主db连接到此处结束使用，流式生成器将使用独立会话
     
     # 后台任务：记录日志（使用独立会话）
     async def save_log_background(log_data: dict):
@@ -890,6 +1018,8 @@ async def gemini_stream_generate_content(
                 latency = log_data.get("latency_ms", 0)
                 status_code = log_data.get("status_code", 200)
                 error_msg = log_data.get("error_message")
+                cred_id = log_data.get("cred_id")
+                cred_email = log_data.get("cred_email")
                 
                 # 错误分类
                 error_type = None
@@ -899,7 +1029,7 @@ async def gemini_stream_generate_content(
                 
                 log = UsageLog(
                     user_id=user_id,
-                    credential_id=credential_id,
+                    credential_id=cred_id,
                     model=model,
                     endpoint="/v1beta/streamGenerateContent",
                     status_code=status_code,
@@ -908,19 +1038,20 @@ async def gemini_stream_generate_content(
                     error_message=error_msg[:2000] if error_msg else None,
                     error_type=error_type,
                     error_code=error_code,
-                    credential_email=credential_email
+                    credential_email=cred_email
                 )
                 bg_db.add(log)
                 
                 # 更新凭证使用次数
-                from app.models.user import Credential
-                cred_result = await bg_db.execute(
-                    select(Credential).where(Credential.id == credential_id)
-                )
-                cred = cred_result.scalar_one_or_none()
-                if cred:
-                    cred.total_requests = (cred.total_requests or 0) + 1
-                    cred.last_used_at = datetime.utcnow()
+                if cred_id:
+                    from app.models.user import Credential
+                    cred_result = await bg_db.execute(
+                        select(Credential).where(Credential.id == cred_id)
+                    )
+                    cred = cred_result.scalar_one_or_none()
+                    if cred:
+                        cred.total_requests = (cred.total_requests or 0) + 1
+                        cred.last_used_at = datetime.utcnow()
                 
                 await bg_db.commit()
                 
@@ -938,122 +1069,166 @@ async def gemini_stream_generate_content(
         except Exception as log_err:
             print(f"[Gemini Stream] ❌ 后台日志记录失败: {log_err}", flush=True)
     
-    # 流式转发
-    import httpx
-    url = "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse"
-    
-    request_body = {"contents": contents}
-    if "generationConfig" in body:
-        gen_config = body["generationConfig"].copy() if isinstance(body["generationConfig"], dict) else body["generationConfig"]
-        # 防呆设计：topK 有效范围为 1-64（Gemini CLI API 支持范围为 1 inclusive 到 65 exclusive）
-        # 当 topK 为 0 或无效值时，使用最大默认值 64；超过 64 时也锁定为 64
-        if isinstance(gen_config, dict) and "topK" in gen_config:
-            if gen_config["topK"] is not None and (gen_config["topK"] < 1 or gen_config["topK"] > 64):
-                print(f"[Gemini Stream] ⚠️ topK={gen_config['topK']} 超出有效范围(1-64)，已自动调整为 64", flush=True)
-                gen_config["topK"] = 64
-        # 防呆设计：maxOutputTokens 有效范围为 1-65536（API 支持范围为 1 inclusive 到 65537 exclusive）
-        if isinstance(gen_config, dict) and "maxOutputTokens" in gen_config:
-            if gen_config["maxOutputTokens"] is not None and (gen_config["maxOutputTokens"] < 1 or gen_config["maxOutputTokens"] > 65536):
-                print(f"[Gemini Stream] ⚠️ maxOutputTokens={gen_config['maxOutputTokens']} 超出有效范围(1-65536)，已自动调整为 65536", flush=True)
-                gen_config["maxOutputTokens"] = 65536
-        request_body["generationConfig"] = gen_config
-    if "systemInstruction" in body:
-        request_body["systemInstruction"] = body["systemInstruction"]
-    if "safetySettings" in body:
-        request_body["safetySettings"] = body["safetySettings"]
-    if "tools" in body:
-        request_body["tools"] = body["tools"]
-    
-    payload = {"model": model, "project": project_id, "request": request_body}
-    
-    async def stream_generator():
-        """🚀 流式生成器（不持有主db连接，使用独立会话处理数据库操作）"""
-        nonlocal background_tasks
-        cd_seconds = None
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST", url,
-                    headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-                    json=payload
-                ) as response:
-                    if response.status_code != 200:
-                        error = await response.aread()
-                        error_text = error.decode()[:500]
-                        print(f"[Gemini Stream] ❌ 错误 {response.status_code}: {error_text}", flush=True)
-                        
-                        # 使用独立会话处理凭证失败
-                        try:
-                            async with async_session() as stream_db:
-                                # 401/403 错误自动禁用凭证
-                                if response.status_code in [401, 403]:
-                                    await CredentialPool.handle_credential_failure(stream_db, credential_id, f"API Error {response.status_code}: {error_text}")
-                                # 429 错误解析 Google 返回的 CD 时间
-                                elif response.status_code == 429:
-                                    cd_seconds = await CredentialPool.handle_429_rate_limit(
-                                        stream_db, credential_id, model, error_text, dict(response.headers)
-                                    )
-                        except Exception as db_err:
-                            print(f"[Gemini Stream] ⚠️ 处理凭证失败时出错: {db_err}", flush=True)
-                        
-                        # 后台记录日志
-                        latency = (time.time() - start_time) * 1000
-                        background_tasks.add_task(save_log_background, {
-                            "status_code": response.status_code,
-                            "error_message": error_text,
-                            "latency_ms": latency,
-                            "cd_seconds": cd_seconds
-                        })
-                        yield f"data: {json.dumps({'error': error.decode()})}\n\n"
-                        return
-                    
-                    async for line in response.aiter_lines():
-                        if line:
-                            # 转换 SSE 数据格式
-                            if line.startswith("data: "):
-                                try:
-                                    data = json.loads(line[6:])
-                                    if "response" in data:
-                                        # 转换格式
-                                        standard_data = data.get("response", {})
-                                        if "modelVersion" in data:
-                                            standard_data["modelVersion"] = data["modelVersion"]
-                                        yield f"data: {json.dumps(standard_data)}\n\n"
-                                    else:
-                                        yield f"{line}\n"
-                                except:
-                                    yield f"{line}\n"
-                            else:
-                                yield f"{line}\n"
+    async def stream_generator_with_retry():
+        """🚀 流式生成器（带重试功能，使用独立会话进行数据库操作）"""
+        nonlocal access_token, project_id, tried_credential_ids
+        current_cred_id = first_credential_id
+        current_cred_email = first_credential_email
+        last_error = None
+        
+        for stream_retry in range(max_retries + 1):
+            cd_seconds = None
+            payload = {"model": model, "project": project_id, "request": request_body}
             
-            # 成功：后台记录日志
-            latency = (time.time() - start_time) * 1000
-            background_tasks.add_task(save_log_background, {
-                "status_code": 200,
-                "latency_ms": latency
-            })
-        except Exception as e:
-            error_str = str(e)
-            
-            # 使用独立会话处理凭证失败
             try:
-                async with async_session() as stream_db:
-                    await CredentialPool.handle_credential_failure(stream_db, credential_id, error_str)
-            except Exception as db_err:
-                print(f"[Gemini Stream] ⚠️ 标记凭证失败时出错: {db_err}", flush=True)
-            
-            # 后台记录日志
-            status_code = extract_status_code(error_str)
-            latency = (time.time() - start_time) * 1000
-            background_tasks.add_task(save_log_background, {
-                "status_code": status_code,
-                "error_message": error_str,
-                "latency_ms": latency
-            })
-            yield f"data: {json.dumps({'error': error_str})}\n\n"
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    async with client.stream(
+                        "POST", url,
+                        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+                        json=payload
+                    ) as response:
+                        if response.status_code != 200:
+                            # 一开始就报错，可以重试
+                            error = await response.aread()
+                            error_text = error.decode()[:500]
+                            last_error = f"API Error {response.status_code}: {error_text}"
+                            print(f"[Gemini Stream] ❌ 错误 {response.status_code}: {error_text}", flush=True)
+                            
+                            # 使用独立会话处理凭证失败
+                            try:
+                                async with async_session() as stream_db:
+                                    if response.status_code in [401, 403]:
+                                        await CredentialPool.handle_credential_failure(stream_db, current_cred_id, last_error)
+                                    elif response.status_code == 429:
+                                        cd_seconds = await CredentialPool.handle_429_rate_limit(
+                                            stream_db, current_cred_id, model, error_text, dict(response.headers)
+                                        )
+                            except Exception as db_err:
+                                print(f"[Gemini Stream] ⚠️ 处理凭证失败时出错: {db_err}", flush=True)
+                            
+                            # ✅ 每次尝试都记录日志（包括中间的重试）
+                            attempt_latency = (time.time() - start_time) * 1000
+                            background_tasks.add_task(save_log_background, {
+                                "status_code": response.status_code,
+                                "error_message": error_text,
+                                "latency_ms": attempt_latency,
+                                "cd_seconds": cd_seconds,
+                                "cred_id": current_cred_id,
+                                "cred_email": current_cred_email
+                            })
+                            
+                            # 检查是否应该重试
+                            should_retry = response.status_code in [429, 500, 503, 404]
+                            if should_retry and stream_retry < max_retries:
+                                print(f"[Gemini Stream] 🔄 切换凭证重试 ({stream_retry + 2}/{max_retries + 1})", flush=True)
+                                
+                                # 使用独立会话获取新凭证
+                                try:
+                                    async with async_session() as stream_db:
+                                        new_credential = await CredentialPool.get_available_credential(
+                                            stream_db, user_id=user_id, user_has_public_creds=user_has_public,
+                                            model=model, exclude_ids=tried_credential_ids
+                                        )
+                                        if new_credential:
+                                            tried_credential_ids.add(new_credential.id)
+                                            new_token = await CredentialPool.get_access_token(new_credential, stream_db)
+                                            if new_token:
+                                                current_cred_id = new_credential.id
+                                                current_cred_email = new_credential.email
+                                                access_token = new_token
+                                                project_id = new_credential.project_id or ""
+                                                print(f"[Gemini Stream] 🔄 切换到凭证: {current_cred_email}", flush=True)
+                                                continue
+                                except Exception as retry_err:
+                                    print(f"[Gemini Stream] ⚠️ 获取新凭证失败: {retry_err}", flush=True)
+                            
+                            # 无法重试，输出错误（日志已记录）
+                            yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error.decode()}'})}\n\n"
+                            return
+                        
+                        # 响应成功，开始输出数据（此后无法重试）
+                        async for line in response.aiter_lines():
+                            if line:
+                                # 转换 SSE 数据格式
+                                if line.startswith("data: "):
+                                    try:
+                                        data = json.loads(line[6:])
+                                        if "response" in data:
+                                            standard_data = data.get("response", {})
+                                            if "modelVersion" in data:
+                                                standard_data["modelVersion"] = data["modelVersion"]
+                                            yield f"data: {json.dumps(standard_data)}\n\n"
+                                        else:
+                                            yield f"{line}\n"
+                                    except:
+                                        yield f"{line}\n"
+                                else:
+                                    yield f"{line}\n"
+                
+                # 成功：后台记录日志
+                latency = (time.time() - start_time) * 1000
+                background_tasks.add_task(save_log_background, {
+                    "status_code": 200,
+                    "latency_ms": latency,
+                    "cred_id": current_cred_id,
+                    "cred_email": current_cred_email
+                })
+                return  # 成功，退出
+                
+            except Exception as e:
+                error_str = str(e)
+                last_error = error_str
+                
+                # 使用独立会话处理凭证失败
+                try:
+                    async with async_session() as stream_db:
+                        await CredentialPool.handle_credential_failure(stream_db, current_cred_id, error_str)
+                except Exception as db_err:
+                    print(f"[Gemini Stream] ⚠️ 标记凭证失败时出错: {db_err}", flush=True)
+                
+                # ✅ 每次尝试都记录日志（包括中间的重试）
+                status_code = extract_status_code(error_str)
+                attempt_latency = (time.time() - start_time) * 1000
+                background_tasks.add_task(save_log_background, {
+                    "status_code": status_code,
+                    "error_message": error_str,
+                    "latency_ms": attempt_latency,
+                    "cred_id": current_cred_id,
+                    "cred_email": current_cred_email
+                })
+                
+                # 检查是否应该重试
+                should_retry = any(code in error_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "ECONNRESET", "ETIMEDOUT"])
+                
+                if should_retry and stream_retry < max_retries:
+                    print(f"[Gemini Stream] ⚠️ 流式请求失败: {error_str}，切换凭证重试 ({stream_retry + 2}/{max_retries + 1})", flush=True)
+                    
+                    # 使用独立会话获取新凭证
+                    try:
+                        async with async_session() as stream_db:
+                            new_credential = await CredentialPool.get_available_credential(
+                                stream_db, user_id=user_id, user_has_public_creds=user_has_public,
+                                model=model, exclude_ids=tried_credential_ids
+                            )
+                            if new_credential:
+                                tried_credential_ids.add(new_credential.id)
+                                new_token = await CredentialPool.get_access_token(new_credential, stream_db)
+                                if new_token:
+                                    current_cred_id = new_credential.id
+                                    current_cred_email = new_credential.email
+                                    access_token = new_token
+                                    project_id = new_credential.project_id or ""
+                                    print(f"[Gemini Stream] 🔄 切换到凭证: {current_cred_email}", flush=True)
+                                    continue
+                    except Exception as retry_err:
+                        print(f"[Gemini Stream] ⚠️ 获取新凭证失败: {retry_err}", flush=True)
+                
+                # 无法重试，输出错误（日志已记录）
+                yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_str}'})}\n\n"
+                return
     
     return StreamingResponse(
-        stream_generator(),
+        stream_generator_with_retry(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
