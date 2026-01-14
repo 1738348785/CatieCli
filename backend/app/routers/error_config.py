@@ -107,10 +107,29 @@ async def get_status(
 ):
     """获取功能状态和错误类型列表"""
     enabled = await get_feature_enabled(db)
+    
+    # 错误类型对应的典型 HTTP 状态码
+    ERROR_TYPE_CODES = {
+        "AUTH_ERROR": "401/403",
+        "RATE_LIMIT": "429",
+        "QUOTA_EXHAUSTED": "429/403",
+        "INVALID_REQUEST": "400",
+        "MODEL_ERROR": "404",
+        "CONTENT_FILTER": "400",
+        "NETWORK_ERROR": "-",
+        "UPSTREAM_ERROR": "500/502/503",
+        "TIMEOUT": "-",
+        "TOKEN_ERROR": "503",
+        "UNKNOWN": "-",
+    }
+    
     return {
         "enabled": enabled,
         "error_types": [
-            {"value": k, "label": v}
+            {
+                "value": k, 
+                "label": f"{v} ({ERROR_TYPE_CODES.get(k, '-')})"
+            }
             for k, v in ERROR_TYPE_NAMES.items()
         ]
     }
