@@ -351,13 +351,29 @@ class AntigravityClient:
         messages: list,
         **kwargs
     ) -> Dict[str, Any]:
-        """OpenAI兼容的chat completions (非流式)"""
-        contents, system_instruction = self._convert_messages_to_contents(messages)
-        generation_config = self._build_generation_config(model, kwargs)
+        """OpenAI兼容的chat completions (非流式) - 使用 gcli2api 风格转换"""
+        # 1. 构建完整的 OpenAI 请求对象
         gemini_model = self._map_model_name(model)
-        
         print(f"[AntigravityClient] 模型名映射: {model} -> {gemini_model}", flush=True)
         
+        openai_request = {
+            "model": gemini_model,
+            "messages": messages,
+            **kwargs
+        }
+        
+        # 2. 使用 gcli2api 风格的转换器将 OpenAI 格式转换为 Gemini 格式
+        from app.services.openai2gemini import convert_openai_to_gemini_request
+        gemini_dict = await convert_openai_to_gemini_request(openai_request)
+        
+        print(f"[AntigravityClient] OpenAI->Gemini 转换完成, contents数量: {len(gemini_dict.get('contents', []))}", flush=True)
+        
+        # 3. 提取转换后的字段
+        contents = gemini_dict.get("contents", [])
+        generation_config = gemini_dict.get("generationConfig", {})
+        system_instruction = gemini_dict.get("systemInstruction")
+        
+        # 4. 调用 generate_content (会在内部调用 _normalize_antigravity_request)
         result = await self.generate_content(gemini_model, contents, generation_config, system_instruction)
         return self._convert_to_openai_response(result, model)
     
@@ -367,10 +383,24 @@ class AntigravityClient:
         messages: list,
         **kwargs
     ) -> AsyncGenerator[str, None]:
-        """OpenAI兼容的chat completions (流式)"""
-        contents, system_instruction = self._convert_messages_to_contents(messages)
-        generation_config = self._build_generation_config(model, kwargs)
+        """OpenAI兼容的chat completions (流式) - 使用 gcli2api 风格转换"""
+        # 1. 构建完整的 OpenAI 请求对象
         gemini_model = self._map_model_name(model)
+        
+        openai_request = {
+            "model": gemini_model,
+            "messages": messages,
+            **kwargs
+        }
+        
+        # 2. 使用转换器
+        from app.services.openai2gemini import convert_openai_to_gemini_request
+        gemini_dict = await convert_openai_to_gemini_request(openai_request)
+        
+        # 3. 提取字段
+        contents = gemini_dict.get("contents", [])
+        generation_config = gemini_dict.get("generationConfig", {})
+        system_instruction = gemini_dict.get("systemInstruction")
         
         async for chunk in self.generate_content_stream(gemini_model, contents, generation_config, system_instruction):
             yield self._convert_to_openai_stream(chunk, model)
@@ -381,12 +411,26 @@ class AntigravityClient:
         messages: list,
         **kwargs
     ) -> AsyncGenerator[str, None]:
-        """假流式: 先发心跳，拿到完整响应后一次性输出"""
+        """假流式: 先发心跳，拿到完整响应后一次性输出 - 使用 gcli2api 风格转换"""
         import asyncio
         
-        contents, system_instruction = self._convert_messages_to_contents(messages)
-        generation_config = self._build_generation_config(model, kwargs)
+        # 1. 构建完整的 OpenAI 请求对象
         gemini_model = self._map_model_name(model)
+        
+        openai_request = {
+            "model": gemini_model,
+            "messages": messages,
+            **kwargs
+        }
+        
+        # 2. 使用转换器
+        from app.services.openai2gemini import convert_openai_to_gemini_request
+        gemini_dict = await convert_openai_to_gemini_request(openai_request)
+        
+        # 3. 提取字段
+        contents = gemini_dict.get("contents", [])
+        generation_config = gemini_dict.get("generationConfig", {})
+        system_instruction = gemini_dict.get("systemInstruction")
         
         # 发送初始 chunk（空内容，保持连接）
         initial_chunk = {

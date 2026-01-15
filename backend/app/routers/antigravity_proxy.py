@@ -383,9 +383,15 @@ async def chat_completions(
         raise HTTPException(status_code=503, detail="凭证未激活 Antigravity，无法获取 project_id")
     first_credential_id = credential.id
     first_credential_email = credential.email
-    print(f"[Antigravity Proxy] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
+    print(f"[Antigravity Proxy] ★★★ 凭证信息 ★★★", flush=True)
+    print(f"[Antigravity Proxy] ★ 凭证邮箱: {credential.email}", flush=True)
+    print(f"[Antigravity Proxy] ★ Project ID: {project_id}", flush=True)
+    print(f"[Antigravity Proxy] ★ 请求模型: {model}", flush=True)
+    print(f"[Antigravity Proxy] ★ Token前20字符: {access_token[:20] if access_token else 'None'}...", flush=True)
+    print(f"[Antigravity Proxy] ★★★★★★★★★★★★★★★", flush=True)
     
     client = AntigravityClient(access_token, project_id)
+    print(f"[Antigravity Proxy] AntigravityClient 已创建, api_base: {client.api_base}", flush=True)
     use_fake_streaming = client.is_fake_streaming(model)
     last_error = None
     
