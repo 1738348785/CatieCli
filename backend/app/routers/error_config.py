@@ -117,7 +117,7 @@ async def get_status(
         "MODEL_ERROR": "404",
         "CONTENT_FILTER": "400",
         "NETWORK_ERROR": "500",
-        "UPSTREAM_ERROR": "5xx",
+        "UPSTREAM_ERROR": "500/502/503/504",
         "TIMEOUT": "超时",
         "TOKEN_ERROR": "503",
         "UNKNOWN": "其他",
