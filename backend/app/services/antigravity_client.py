@@ -451,30 +451,8 @@ class AntigravityClient:
             if model.startswith(prefix):
                 model = model[len(prefix):]
         
-        # 移除思维模式后缀 (单独处理 thinking)
-        is_thinking = False
-        for suffix in ["-maxthinking", "-nothinking", "-thinking"]:
-            if model.endswith(suffix):
-                model = model[:-len(suffix)]
-                if suffix == "-thinking" or suffix == "-maxthinking":
-                    is_thinking = True
-                break
-        
-        # Claude 模型名称映射 (Antigravity 使用特定格式)
-        # claude-sonnet-4-5 -> Claude Sonnet 4.5
-        # claude-opus-4-5 -> Claude Opus 4.5
-        claude_mapping = {
-            "claude-sonnet-4-5": "Claude Sonnet 4.5",
-            "claude-opus-4-5": "Claude Opus 4.5",
-            "claude-sonnet-4.5": "Claude Sonnet 4.5",
-            "claude-opus-4.5": "Claude Opus 4.5",
-        }
-        
-        model_lower = model.lower()
-        if model_lower in claude_mapping:
-            model = claude_mapping[model_lower]
-            if is_thinking:
-                model += " Thinking"
+        # gcli2api 不做模型名称转换，直接返回处理后的模型名
+        # 注意：不需要将 claude-sonnet-4-5 转换为 "Claude Sonnet 4.5"
         
         return model
     
