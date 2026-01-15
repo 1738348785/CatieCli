@@ -157,7 +157,7 @@ async def upload_antigravity_credentials(
                                 "User-Agent": ANTIGRAVITY_USER_AGENT
                             }
                             test_payload = {
-                                "model": "gemini-2.0-flash-exp",
+                                "model": "gemini-2.5-flash",
                                 "project": project_id,
                                 "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
                             }
@@ -442,7 +442,7 @@ async def verify_my_antigravity_credential(
                     "User-Agent": ANTIGRAVITY_USER_AGENT
                 }
                 test_payload = {
-                    "model": "gemini-2.0-flash-exp",
+                    "model": "gemini-2.5-flash",
                     "project": cred.project_id,
                     "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
                 }
@@ -857,7 +857,7 @@ async def admin_verify_antigravity_credential(
                 "User-Agent": ANTIGRAVITY_USER_AGENT
             }
             test_payload = {
-                "model": "gemini-2.0-flash-exp",
+                "model": "gemini-2.5-flash",
                 "project": cred.project_id,
                 "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
             }
@@ -959,7 +959,7 @@ async def verify_all_antigravity_credentials(
                                 "User-Agent": ANTIGRAVITY_USER_AGENT
                             }
                             test_payload = {
-                                "model": "gemini-2.0-flash-exp",
+                                "model": "gemini-2.5-flash",
                                 "project": project_id,
                                 "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
                             }
