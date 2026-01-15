@@ -11,6 +11,10 @@ class AntigravityClient:
     # Antigravity User-Agent (与 gcli2api 保持一致)
     USER_AGENT = "antigravity/1.11.3 windows/amd64"
     
+    # 官方系统提示词 (Antigravity 要求，否则返回 429)
+    # 参考 gcli2api 项目
+    OFFICIAL_SYSTEM_PROMPT = """You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding. You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question."""
+    
     def __init__(self, access_token: str, project_id: str = None):
         self.access_token = access_token
         self.project_id = project_id or ""
@@ -51,8 +55,15 @@ class AntigravityClient:
         request_body = {"contents": contents}
         if generation_config:
             request_body["generationConfig"] = generation_config
-        if system_instruction:
-            request_body["systemInstruction"] = system_instruction
+        
+        # 自动添加官方系统提示词 (防止 429 错误)
+        # 将官方提示词与用户提示词合并
+        final_system_parts = [{"text": self.OFFICIAL_SYSTEM_PROMPT}]
+        if system_instruction and "parts" in system_instruction:
+            final_system_parts.extend(system_instruction["parts"])
+        elif system_instruction and "text" in system_instruction:
+            final_system_parts.append({"text": system_instruction["text"]})
+        request_body["systemInstruction"] = {"parts": final_system_parts}
         
         # 添加安全设置
         request_body["safetySettings"] = [
@@ -107,8 +118,14 @@ class AntigravityClient:
         request_body = {"contents": contents}
         if generation_config:
             request_body["generationConfig"] = generation_config
-        if system_instruction:
-            request_body["systemInstruction"] = system_instruction
+        
+        # 自动添加官方系统提示词 (防止 429 错误)
+        final_system_parts = [{"text": self.OFFICIAL_SYSTEM_PROMPT}]
+        if system_instruction and "parts" in system_instruction:
+            final_system_parts.extend(system_instruction["parts"])
+        elif system_instruction and "text" in system_instruction:
+            final_system_parts.append({"text": system_instruction["text"]})
+        request_body["systemInstruction"] = {"parts": final_system_parts}
         
         # 添加安全设置
         request_body["safetySettings"] = [
