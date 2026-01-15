@@ -458,25 +458,11 @@ class AntigravityClient:
         """构建生成配置 (与 gcli2api gemini_fix.py 保持一致)"""
         generation_config = {}
         
-        # 基础配置
+        # 基础配置 - 只保留用户传入的参数，其他强制参数在 _normalize_antigravity_request 中处理
         if "temperature" in kwargs:
             generation_config["temperature"] = kwargs["temperature"]
         if "top_p" in kwargs:
             generation_config["topP"] = kwargs["top_p"]
-        
-        # 强制设置 maxOutputTokens = 64000 (与 gcli2api 一致)
-        generation_config["maxOutputTokens"] = 64000
-        
-        # 强制设置 topK = 64 (与 gcli2api 一致)
-        generation_config["topK"] = 64
-        
-        # 为 thinking 模型添加 thinkingConfig (与 gcli2api gemini_fix.py 第206-215行一致)
-        if self._is_thinking_model(model):
-            generation_config["thinkingConfig"] = {
-                "thinkingBudget": 1024,
-                "includeThoughts": True
-            }
-            print(f"[AntigravityClient] 已添加 thinkingConfig: thinkingBudget=1024", flush=True)
         
         return generation_config
     
@@ -607,9 +593,7 @@ class AntigravityClient:
         return contents, system_instruction
     
     def _map_model_name(self, model: str) -> str:
-        """映射模型名称 - 移除自定义前缀并处理特殊模型 (与 gcli2api gemini_fix.py 第259-274行一致)"""
-        original_model = model
-        
+        """映射模型名称 - 只做前缀去除，Claude映射在 _normalize_antigravity_request 中完成"""
         # 移除 agy- 前缀 (CatieCli 自定义)
         if model.startswith("agy-"):
             model = model[4:]
@@ -620,24 +604,6 @@ class AntigravityClient:
         for prefix in ["假流式/", "流式抗截断/"]:
             if model.startswith(prefix):
                 model = model[len(prefix):]
-        
-        # 移除 -thinking 后缀 (如果有)
-        model = model.replace("-thinking", "")
-        
-        # Claude 模型关键词映射 (与 gcli2api gemini_fix.py 第259-274行完全一致)
-        model_lower = model.lower()
-        if "opus" in model_lower:
-            model = "claude-opus-4-5-thinking"
-        elif "sonnet" in model_lower:
-            model = "claude-sonnet-4-5-thinking"
-        elif "haiku" in model_lower:
-            model = "gemini-2.5-flash"  # gcli2api 将 haiku 映射到 flash
-        elif "claude" in model_lower:
-            # Claude 模型兜底：如果包含 claude 但不是 opus/sonnet/haiku
-            model = "claude-sonnet-4-5-thinking"
-        
-        if original_model != model:
-            print(f"[AntigravityClient] 模型映射: {original_model} -> {model}", flush=True)
         
         return model
     
