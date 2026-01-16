@@ -142,8 +142,11 @@ class GeminiClient:
                 "error": "错误信息" (仅在失败时)
             }
         """
-        # 使用 Antigravity API 端点查询配额（cloudcode-pa 不支持配额查询）
-        url = "https://antigravity.googleapis.com/v1internal:fetchAvailableModels"
+        # 注意：GeminiCLI 凭证无法查询实时配额
+        # - cloudcode-pa.googleapis.com 返回 403 (无权限)
+        # - antigravity.googleapis.com 返回 404 (不接受 GeminiCLI token)
+        # 此方法仅作为尝试，失败后会降级到本地统计
+        url = f"{self.INTERNAL_API_BASE}/v1internal:fetchAvailableModels"
         
         headers = {
             "Authorization": f"Bearer {self.access_token}",

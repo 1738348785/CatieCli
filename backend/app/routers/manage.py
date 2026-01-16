@@ -714,17 +714,7 @@ async def get_credential_quota(
             ]
         }
     
-    # API 失败，返回错误提示（GeminiCLI 凭证不支持实时配额查询）
-    return {
-        "credential_id": credential_id,
-        "credential_name": cred.name,
-        "email": cred.email,
-        "account_type": cred.account_type or "free",
-        "source": "error",
-        "error": f"GeminiCLI 凭证暂不支持实时配额查询 ({api_error_message})",
-        "note": "GeminiCLI 的 OAuth 凭证没有权限访问配额接口，请使用 Antigravity 凭证查询配额"
-    }
-    
+    # API 失败，降级到本地数据库统计
     # ===== 降级：从本地数据库统计配额 =====
     # 获取今天的开始时间（北京时间 15:00 = UTC 07:00 重置）
     now = datetime.utcnow()
