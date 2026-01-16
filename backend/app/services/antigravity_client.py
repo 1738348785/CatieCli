@@ -383,12 +383,22 @@ class AntigravityClient:
         
         headers = self._build_headers()
         
+        # 构建请求体，包含 project_id（如果有）
+        payload = {}
+        if self.project_id:
+            payload["project"] = self.project_id
+        
+        print(f"[AntigravityClient] fetch_quota_info: project={self.project_id}, url={url}", flush=True)
+        
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, headers=headers, json={})
+                response = await client.post(url, headers=headers, json=payload)
+                
+                print(f"[AntigravityClient] fetch_quota_info 响应状态: {response.status_code}", flush=True)
                 
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"[AntigravityClient] fetch_quota_info 响应内容: {json.dumps(data, ensure_ascii=False)[:800]}", flush=True)
                     quota_info = {}
                     
                     if 'models' in data and isinstance(data['models'], dict):
@@ -403,10 +413,14 @@ class AntigravityClient:
                                     "resetTime": reset_time
                                 }
                     
+                    print(f"[AntigravityClient] fetch_quota_info 解析到 {len(quota_info)} 个模型配额", flush=True)
                     return {"success": True, "models": quota_info}
                 else:
-                    return {"success": False, "error": f"API返回错误: {response.status_code}"}
+                    error_text = response.text[:500]
+                    print(f"[AntigravityClient] fetch_quota_info 失败: {response.status_code} - {error_text}", flush=True)
+                    return {"success": False, "error": f"API返回错误: {response.status_code} - {error_text}"}
         except Exception as e:
+            print(f"[AntigravityClient] fetch_quota_info 异常: {e}", flush=True)
             return {"success": False, "error": str(e)}
     
     def is_fake_streaming(self, model: str) -> bool:

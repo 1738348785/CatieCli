@@ -244,6 +244,18 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
                                 models.append({"id": f"agy-{model_id}-2k", "object": "model", "owned_by": "google"})
                                 models.append({"id": f"agy-{model_id}-4k", "object": "model", "owned_by": "google"})
                     
+                    # 强制添加 Claude 模型的不带 -thinking 后缀版本
+                    claude_base_models = [
+                        "claude-opus-4-5", "agy-claude-opus-4-5",
+                        "claude-sonnet-4-5", "agy-claude-sonnet-4-5",
+                    ]
+                    existing_ids = {m["id"] for m in models}
+                    for base_model in claude_base_models:
+                        if base_model not in existing_ids:
+                            models.append({"id": base_model, "object": "model", "owned_by": "google"})
+                            models.append({"id": f"流式抗截断/{base_model}", "object": "model", "owned_by": "google"})
+                            print(f"[Antigravity] ✅ 强制添加 Claude 基础模型: {base_model}", flush=True)
+                    
                     image_variants = [
                         "gemini-3-pro-image", "agy-gemini-3-pro-image",
                         "gemini-3-pro-image-2k", "agy-gemini-3-pro-image-2k",
