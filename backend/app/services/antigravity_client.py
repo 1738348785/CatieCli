@@ -57,6 +57,32 @@ class AntigravityClient:
             "parts": [{"text": self.OFFICIAL_SYSTEM_PROMPT}] + existing_parts
         }
         
+        # ========== 1.5 图片模型处理 (gemini_fix.py 逻辑) ==========
+        if "image" in model.lower():
+            # 图片生成模型特殊处理
+            if "2k" in model.lower():
+                final_model = "gemini-3-pro-image-2k"
+            elif "4k" in model.lower():
+                final_model = "gemini-3-pro-image-4k"
+            else:
+                final_model = "gemini-3-pro-image"
+                
+            generation_config = {
+                "candidateCount": 1,
+                "imageConfig": {}
+            }
+            
+            # 清理不必要的字段
+            result.pop("systemInstruction", None)
+            
+            return {
+                "model": final_model,
+                "request": {
+                    "contents": contents,
+                    "generationConfig": generation_config
+                }
+            }
+        
         # ========== 2. 思考模型处理 (gemini_fix.py 第206-254行) ==========
         is_thinking = "think" in model.lower() or "pro" in model.lower() or "claude" in model.lower()
         
