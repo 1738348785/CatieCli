@@ -704,11 +704,22 @@ class AntigravityClient:
             candidate = response_data["candidates"][0]
             if "content" in candidate and "parts" in candidate["content"]:
                 for part in candidate["content"]["parts"]:
-                    text = part.get("text", "")
-                    if part.get("thought", False):
-                        reasoning_content += text
-                    else:
-                        content += text
+                    # 处理文本
+                    if "text" in part:
+                        text = part.get("text", "")
+                        if part.get("thought", False):
+                            reasoning_content += text
+                        else:
+                            content += text
+                    # 处理图片 (inlineData)
+                    elif "inlineData" in part:
+                        inline_data = part["inlineData"]
+                        mime_type = inline_data.get("mimeType", "image/png")
+                        data = inline_data.get("data", "")
+                        if data:
+                            # 转换为 Markdown 图片格式（使用 data URL）
+                            data_url = f"data:{mime_type};base64,{data}"
+                            content += f"![Generated Image]({data_url})"
         
         message = {
             "role": "assistant",
@@ -747,11 +758,21 @@ class AntigravityClient:
                 candidate = response_data["candidates"][0]
                 if "content" in candidate and "parts" in candidate["content"]:
                     for part in candidate["content"]["parts"]:
-                        text = part.get("text", "")
-                        if part.get("thought", False):
-                            reasoning_content += text
-                        else:
-                            content += text
+                        # 处理文本
+                        if "text" in part:
+                            text = part.get("text", "")
+                            if part.get("thought", False):
+                                reasoning_content += text
+                            else:
+                                content += text
+                        # 处理图片 (inlineData)
+                        elif "inlineData" in part:
+                            inline_data = part["inlineData"]
+                            mime_type = inline_data.get("mimeType", "image/png")
+                            data = inline_data.get("data", "")
+                            if data:
+                                data_url = f"data:{mime_type};base64,{data}"
+                                content += f"![Generated Image]({data_url})"
             
             delta = {}
             if content:
