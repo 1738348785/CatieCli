@@ -217,11 +217,9 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
             except Exception as e:
                 print(f"[Antigravity] 获取动态模型列表失败: {e}", flush=True)
     
-    # 回退到静态模型列表 (包含 Antigravity 支持的所有模型)
+    # 回退到静态模型列表 (仅 3.0 级别模型，2.5已移除)
     base_models = [
-        # Gemini 模型
-        "gemini-2.5-pro",
-        "gemini-2.5-flash",
+        # Gemini 3.0 模型
         "gemini-3-pro-preview",
         "gemini-3-flash-preview",
         # Claude 模型 (Antigravity 独有) - 使用用户友好的名称
