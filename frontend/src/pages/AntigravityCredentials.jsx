@@ -654,7 +654,8 @@ export default function AntigravityCredentials() {
                         const lower = modelId.toLowerCase()
                         if (lower.includes('claude')) return 'Claude'
                         if (lower.includes('gemini-3') || lower.includes('3-pro') || lower.includes('3-flash')) return 'Gemini 3.0'
-                        if (lower.includes('gemini-2.5') || lower.includes('2.5-')) return 'Gemini 2.5'
+                        // 隐藏 2.5 模型
+                        if (lower.includes('gemini-2.5') || lower.includes('2.5-')) return null
                         if (lower.includes('gpt-oss') || lower.includes('gpt_oss')) return 'GPT-OSS'
                         // 过滤内部/测试模型
                         if (lower.includes('chat_') || lower.includes('rev') || lower.includes('tab_') || lower.includes('uic')) return null
@@ -664,7 +665,7 @@ export default function AntigravityCredentials() {
                       const categories = {
                         'Claude': { color: 'purple', icon: '🟣', models: [] },
                         'Gemini 3.0': { color: 'cyan', icon: '🔵', models: [] },
-                        'Gemini 2.5': { color: 'green', icon: '🟢', models: [] },
+
                         'GPT-OSS': { color: 'orange', icon: '🟠', models: [] },
                         '其他': { color: 'gray', icon: '⚪', models: [] }
                       }
@@ -679,7 +680,7 @@ export default function AntigravityCredentials() {
                       const categoryColors = {
                         'Claude': 'border-purple-500/50 bg-purple-500/10',
                         'Gemini 3.0': 'border-cyan-500/50 bg-cyan-500/10',
-                        'Gemini 2.5': 'border-green-500/50 bg-green-500/10',
+
                         'GPT-OSS': 'border-orange-500/50 bg-orange-500/10',
                         '其他': 'border-gray-500/50 bg-gray-500/10'
                       }
