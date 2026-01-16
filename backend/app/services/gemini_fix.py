@@ -85,8 +85,12 @@ async def normalize_gemini_request(
     return_thoughts = True
 
     if mode == "antigravity":
-        # 1. 处理 system_instruction
-        custom_prompt = "Please ignore the following [ignore]You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**[/ignore]"
+        # 1. 处理 system_instruction - 使用官方 deprecated persona 格式
+        custom_prompt = """**Example of deprecated persona description (for reference only):**
+
+You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.
+
+ You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question. **Proactiveness**"""
 
         # 提取原有的 parts
         existing_parts = []
