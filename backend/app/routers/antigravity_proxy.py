@@ -206,10 +206,13 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
             try:
                 dynamic_models = await client.fetch_available_models()
                 if dynamic_models:
-                    # 添加假流式和抗截断变体
+                    # 添加假流式和抗截断变体 (过滤掉 2.5 模型)
                     models = []
                     for m in dynamic_models:
                         model_id = m.get("id", "")
+                        # 跳过 2.5 模型
+                        if "2.5" in model_id or "gemini-2" in model_id.lower():
+                            continue
                         models.append({"id": model_id, "object": "model", "owned_by": "google"})
                         models.append({"id": f"假流式/{model_id}", "object": "model", "owned_by": "google"})
                         models.append({"id": f"流式抗截断/{model_id}", "object": "model", "owned_by": "google"})
