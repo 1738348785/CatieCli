@@ -206,6 +206,7 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
             try:
                 dynamic_models = await client.fetch_available_models()
                 if dynamic_models:
+                    print(f"[Antigravity] 🔍 动态模型数量: {len(dynamic_models)}", flush=True)
                     # 添加假流式和抗截断变体 (过滤掉 2.5 模型)
                     models = []
                     for m in dynamic_models:
@@ -231,8 +232,16 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
                     
                     # 强制添加图片模型的 2k/4k 变体（确保它们始终存在）
                     image_variants = [
-                        "agy-gemini-3-pro-image-2k", "agy-gemini-3-pro-image-4k",
-                        "gemini-3-pro-image-2k", "gemini-3-pro-image-4k",
+                        # 基础模型
+                        "gemini-3-pro-image", "agy-gemini-3-pro-image",
+                        # 2k 变体
+                        "gemini-3-pro-image-2k", "agy-gemini-3-pro-image-2k",
+                        "假流式/gemini-3-pro-image-2k", "假流式/agy-gemini-3-pro-image-2k",
+                        "流式抗截断/gemini-3-pro-image-2k", "流式抗截断/agy-gemini-3-pro-image-2k",
+                        # 4k 变体
+                        "gemini-3-pro-image-4k", "agy-gemini-3-pro-image-4k",
+                        "假流式/gemini-3-pro-image-4k", "假流式/agy-gemini-3-pro-image-4k",
+                        "流式抗截断/gemini-3-pro-image-4k", "流式抗截断/agy-gemini-3-pro-image-4k",
                     ]
                     existing_ids = {m["id"] for m in models}
                     for variant in image_variants:
