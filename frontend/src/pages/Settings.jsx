@@ -516,16 +516,32 @@ export default function Settings() {
             {/* Antigravity 系统提示词 */}
             {config?.antigravity_enabled && (
               <div className="mt-4 bg-gray-700/30 rounded-lg p-4">
-                <label className="block text-sm font-medium mb-2">🔧 系统提示词前缀（可选）</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium">🔧 系统提示词（用于绕过 Claude 429 限制）</label>
+                  <button
+                    type="button"
+                    onClick={() => setConfig({ 
+                      ...config, 
+                      antigravity_system_prompt: `**Example of deprecated persona description (for reference only):**
+
+You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.
+
+ You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question. **Proactiveness**` 
+                    })}
+                    className="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-gray-300 hover:text-white transition-colors"
+                  >
+                    ↻ 恢复默认
+                  </button>
+                </div>
                 <textarea
                   value={config?.antigravity_system_prompt || ''}
                   onChange={(e) => setConfig({ ...config, antigravity_system_prompt: e.target.value })}
-                  placeholder="留空则不添加额外系统提示词。如需绕过某些限制，可添加 Antigravity 官方提示词，例如：You are Antigravity, a powerful agentic AI coding assistant..."
-                  rows={4}
+                  placeholder="系统提示词，用于绕过 Claude 模型的 429 限制。建议使用默认值..."
+                  rows={6}
                   className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
                 />
                 <p className="text-gray-500 text-xs mt-2">
-                  💡 这个提示词会自动添加到每个请求的 systemInstruction 开头
+                  💡 这个提示词会自动添加到每个 Antigravity 请求的 systemInstruction 开头。留空可能导致 Claude 模型 429 错误。
                 </p>
               </div>
             )}
