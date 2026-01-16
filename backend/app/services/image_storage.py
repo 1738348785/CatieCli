@@ -14,7 +14,8 @@ class ImageStorage:
     """本地图片存储服务"""
     
     # 图片存储目录（相对于 app 目录）
-    STORAGE_DIR = Path(__file__).parent.parent / "static" / "images"
+    # backend/app/services/image_storage.py -> backend/static/images
+    STORAGE_DIR = Path(__file__).parent.parent.parent / "static" / "images"
     
     @classmethod
     def init_storage(cls):
