@@ -1275,12 +1275,20 @@ async def update_config(
 
 @router.get("/stats/global")
 async def get_global_stats(
+    api_type: str = "all",  # all, cli, antigravity
     user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取全站统计（按模型分类）- 带缓存"""
-    # 尝试从缓存获取（缓存5秒）
-    cached_stats = cache.get("stats:global")
+    """获取全站统计（按模型分类）- 带缓存
+    
+    api_type: 
+        - all: 所有请求
+        - cli: GeminiCLI 请求（模型不含 antigravity/）
+        - antigravity: Antigravity 请求（模型含 antigravity/）
+    """
+    # 尝试从缓存获取（缓存5秒，按 api_type 分开缓存）
+    cache_key = f"stats:global:{api_type}"
+    cached_stats = cache.get(cache_key)
     if cached_stats:
         return cached_stats
     
@@ -1295,12 +1303,23 @@ async def get_global_stats(
     else:
         start_of_day = reset_time_utc
     
+    # 构建 API 类型过滤条件
+    def build_api_type_filter():
+        if api_type == "cli":
+            return UsageLog.model.notlike('antigravity/%')
+        elif api_type == "antigravity":
+            return UsageLog.model.like('antigravity/%')
+        else:
+            return True  # 不过滤
+    
+    api_filter = build_api_type_filter()
+    
     # 按模型分类统计（今日）
+    base_query = select(UsageLog.model, func.count(UsageLog.id).label("count")).where(UsageLog.created_at >= start_of_day)
+    if api_type != "all":
+        base_query = base_query.where(api_filter)
     model_stats_result = await db.execute(
-        select(UsageLog.model, func.count(UsageLog.id).label("count"))
-        .where(UsageLog.created_at >= start_of_day)
-        .group_by(UsageLog.model)
-        .order_by(func.count(UsageLog.id).desc())
+        base_query.group_by(UsageLog.model).order_by(func.count(UsageLog.id).desc())
     )
     model_stats = [{"model": row[0] or "unknown", "count": row[1]} for row in model_stats_result.all()]
     
@@ -1325,23 +1344,24 @@ async def get_global_stats(
     flash_count = sum(s["count"] for s in model_stats if is_flash(s["model"]))
     
     # 最近1小时请求数
-    hour_result = await db.execute(
-        select(func.count(UsageLog.id)).where(UsageLog.created_at >= hour_ago)
-    )
+    hour_query = select(func.count(UsageLog.id)).where(UsageLog.created_at >= hour_ago)
+    if api_type != "all":
+        hour_query = hour_query.where(api_filter)
+    hour_result = await db.execute(hour_query)
     hour_requests = hour_result.scalar() or 0
     
     # 今日总请求数
-    today_result = await db.execute(
-        select(func.count(UsageLog.id)).where(UsageLog.created_at >= start_of_day)
-    )
+    today_query = select(func.count(UsageLog.id)).where(UsageLog.created_at >= start_of_day)
+    if api_type != "all":
+        today_query = today_query.where(api_filter)
+    today_result = await db.execute(today_query)
     today_requests = today_result.scalar() or 0
     
     # 今日成功/失败统计
-    today_success_result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.created_at >= start_of_day)
-        .where(UsageLog.status_code == 200)
-    )
+    success_query = select(func.count(UsageLog.id)).where(UsageLog.created_at >= start_of_day).where(UsageLog.status_code == 200)
+    if api_type != "all":
+        success_query = success_query.where(api_filter)
+    today_success_result = await db.execute(success_query)
     today_success = today_success_result.scalar() or 0
     today_failed = today_requests - today_success
     
