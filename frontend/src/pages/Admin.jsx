@@ -1,31 +1,31 @@
 import {
-    AlertTriangle,
-    ArrowLeft,
-    Cat,
-    Check,
-    ChevronDown,
-    ChevronUp,
-    Download,
-    ExternalLink,
-    Eye,
-    Key,
-    Plus,
-    RefreshCw,
-    ScrollText,
-    Settings,
-    Trash2,
-    Users,
-    X,
+  AlertTriangle,
+  ArrowLeft,
+  Cat,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
+  Eye,
+  Key,
+  Plus,
+  RefreshCw,
+  ScrollText,
+  Settings,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../App";
 import {
-    AlertModal,
-    ConfirmModal,
-    InputModal,
-    QuotaModal,
+  AlertModal,
+  ConfirmModal,
+  InputModal,
+  QuotaModal,
 } from "../components/Modal";
 import { useWebSocket } from "../hooks/useWebSocket";
 
@@ -1163,11 +1163,11 @@ export default function Admin() {
                   <span className="text-gray-500 text-sm ml-auto">
                     {(() => {
                       const filtered = credentials.filter((c) => {
-                        if (
-                          credTypeFilter !== "all" &&
-                          c.api_type !== credTypeFilter
-                        )
-                          return false;
+                        if (credTypeFilter === "geminicli") {
+                          if (c.api_type === "antigravity") return false;
+                        } else if (credTypeFilter === "antigravity") {
+                          if (c.api_type !== "antigravity") return false;
+                        }
                         if (credStatusFilter === "active" && !c.is_active)
                           return false;
                         if (credStatusFilter === "inactive" && c.is_active)
@@ -1197,11 +1197,16 @@ export default function Admin() {
                     <tbody>
                       {credentials
                         .filter((c) => {
-                          if (
-                            credTypeFilter !== "all" &&
-                            c.api_type !== credTypeFilter
-                          )
-                            return false;
+                          // 类型筛选：CLI凭证的api_type可能是geminicli、空或null
+                          if (credTypeFilter === "geminicli") {
+                            if (c.api_type === "antigravity") return false;
+                          } else if (credTypeFilter === "antigravity") {
+                            if (c.api_type !== "antigravity") return false;
+                          } else if (credTypeFilter !== "all") {
+                            // Handles 'all' case implicitly by not returning false
+                            return false; // Should not happen if 'all' is handled
+                          }
+                          // 状态筛选
                           if (credStatusFilter === "active" && !c.is_active)
                             return false;
                           if (credStatusFilter === "inactive" && c.is_active)
