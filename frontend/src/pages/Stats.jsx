@@ -273,23 +273,23 @@ export default function Stats() {
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="bg-green-600/20 border border-green-600/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">
+                <div className="bg-purple-600/20 border border-purple-600/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-400">
                     {globalStats.requests.by_category.flash}
                   </div>
-                  <div className="text-sm text-green-300">Flash 请求</div>
+                  <div className="text-sm text-purple-300">Claude 请求</div>
                 </div>
-                <div className="bg-green-600/20 border border-green-600/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">
+                <div className="bg-blue-600/20 border border-blue-600/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-400">
                     {globalStats.requests.by_category["pro_2.5"]}
                   </div>
-                  <div className="text-sm text-green-300">Pro 请求</div>
+                  <div className="text-sm text-blue-300">Gemini 请求</div>
                 </div>
-                <div className="bg-green-600/20 border border-green-600/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">
+                <div className="bg-gray-600/20 border border-gray-600/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-400">
                     {globalStats.requests.by_category.tier_3}
                   </div>
-                  <div className="text-sm text-green-300">3.0 请求</div>
+                  <div className="text-sm text-gray-300">其他 请求</div>
                 </div>
               </div>
             )}

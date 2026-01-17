@@ -1323,25 +1323,44 @@ async def get_global_stats(
     )
     model_stats = [{"model": row[0] or "unknown", "count": row[1]} for row in model_stats_result.all()]
     
-    # 分类汇总（互斥分类：3.0 > Pro > Flash）
-    # 3.0模型：包含 "gemini-3" 或 "3.0" 或 "tier3" 或以 "3" 开头的版本
-    def is_tier3(model: str) -> bool:
-        m = model.lower()
-        return "gemini-3" in m or "3.0" in m or "tier3" in m or m.startswith("3-") or "/gemini-3" in m
-    
-    # Pro模型：包含 "pro" 但不是3.0模型
-    def is_pro(model: str) -> bool:
-        m = model.lower()
-        return "pro" in m and not is_tier3(model)
-    
-    # Flash模型：包含 "flash" 但不是3.0模型  
-    def is_flash(model: str) -> bool:
-        m = model.lower()
-        return "flash" in m and not is_tier3(model)
-    
-    tier3_count = sum(s["count"] for s in model_stats if is_tier3(s["model"]))
-    pro_count = sum(s["count"] for s in model_stats if is_pro(s["model"]))
-    flash_count = sum(s["count"] for s in model_stats if is_flash(s["model"]))
+    # 分类汇总 - 根据 API 类型使用不同分类方式
+    if api_type == "antigravity":
+        # Antigravity 分类：按模型品牌 (Claude/Gemini/其他)
+        def is_claude(model: str) -> bool:
+            m = model.lower()
+            return "claude" in m
+        
+        def is_gemini(model: str) -> bool:
+            m = model.lower()
+            return "gemini" in m
+        
+        def is_other(model: str) -> bool:
+            return not is_claude(model) and not is_gemini(model)
+        
+        claude_count = sum(s["count"] for s in model_stats if is_claude(s["model"]))
+        gemini_count = sum(s["count"] for s in model_stats if is_gemini(s["model"]))
+        other_count = sum(s["count"] for s in model_stats if is_other(s["model"]))
+        # 使用相同的字段名以兼容前端
+        flash_count = claude_count  # 对应前端 flash -> Claude
+        pro_count = gemini_count    # 对应前端 pro -> Gemini
+        tier3_count = other_count   # 对应前端 tier3 -> 其他
+    else:
+        # CLI/全部 分类：按 Gemini 模型等级（互斥分类：3.0 > Pro > Flash）
+        def is_tier3(model: str) -> bool:
+            m = model.lower()
+            return "gemini-3" in m or "3.0" in m or "tier3" in m or m.startswith("3-") or "/gemini-3" in m
+        
+        def is_pro(model: str) -> bool:
+            m = model.lower()
+            return "pro" in m and not is_tier3(model)
+        
+        def is_flash(model: str) -> bool:
+            m = model.lower()
+            return "flash" in m and not is_tier3(model)
+        
+        tier3_count = sum(s["count"] for s in model_stats if is_tier3(s["model"]))
+        pro_count = sum(s["count"] for s in model_stats if is_pro(s["model"]))
+        flash_count = sum(s["count"] for s in model_stats if is_flash(s["model"]))
     
     # 最近1小时请求数
     hour_query = select(func.count(UsageLog.id)).where(UsageLog.created_at >= hour_ago)
