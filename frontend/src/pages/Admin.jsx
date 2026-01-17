@@ -1,31 +1,31 @@
 import {
-    AlertTriangle,
-    ArrowLeft,
-    Cat,
-    Check,
-    ChevronDown,
-    ChevronUp,
-    Download,
-    ExternalLink,
-    Eye,
-    Key,
-    Plus,
-    RefreshCw,
-    ScrollText,
-    Settings,
-    Trash2,
-    Users,
-    X,
+  AlertTriangle,
+  ArrowLeft,
+  Cat,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
+  Eye,
+  Key,
+  Plus,
+  RefreshCw,
+  ScrollText,
+  Settings,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../App";
 import {
-    AlertModal,
-    ConfirmModal,
-    InputModal,
-    QuotaModal,
+  AlertModal,
+  ConfirmModal,
+  InputModal,
+  QuotaModal,
 } from "../components/Modal";
 import { useWebSocket } from "../hooks/useWebSocket";
 
@@ -51,8 +51,41 @@ export default function Admin() {
   const [credPage, setCredPage] = useState(1);
   const [credTypeFilter, setCredTypeFilter] = useState("all"); // all, cli, antigravity
   const [credStatusFilter, setCredStatusFilter] = useState("all"); // all, active, inactive
+  const [credFolderFilter, setCredFolderFilter] = useState("all"); // all, [文件夹名]
   const [verifyingSingle, setVerifyingSingle] = useState(null); // 正在检测的凭证ID
   const credPerPage = 20;
+
+  // localStorage 文件夹映射（不修改后端，纯前端分类）
+  const [credFolders, setCredFolders] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("credFolders") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  // 保存文件夹映射到 localStorage
+  const saveCredFolders = (newFolders) => {
+    setCredFolders(newFolders);
+    localStorage.setItem("credFolders", JSON.stringify(newFolders));
+  };
+
+  // 获取所有使用中的文件夹
+  const allFolders = [...new Set(Object.values(credFolders).filter((f) => f))];
+
+  // 更新凭证文件夹（纯前端）
+  const updateCredFolder = (credId) => {
+    const currentFolder = credFolders[credId] || "";
+    const newFolder = prompt("设置分类/文件夹（留空移除分类）", currentFolder);
+    if (newFolder === null) return; // 取消
+    const updated = { ...credFolders };
+    if (newFolder.trim()) {
+      updated[credId] = newFolder.trim();
+    } else {
+      delete updated[credId];
+    }
+    saveCredFolders(updated);
+  };
 
   // 模态框状态
   const [alertModal, setAlertModal] = useState({
@@ -1188,6 +1221,30 @@ export default function Admin() {
                       ))}
                     </div>
                   </div>
+                  {/* 文件夹筛选 */}
+                  {allFolders.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                      <span className="text-xs sm:text-sm text-gray-400">
+                        📁
+                      </span>
+                      <select
+                        value={credFolderFilter}
+                        onChange={(e) => {
+                          setCredFolderFilter(e.target.value);
+                          setCredPage(1);
+                        }}
+                        className="px-2 py-1 text-xs sm:text-sm bg-dark-700 border border-dark-600 rounded text-gray-300"
+                      >
+                        <option value="all">全部</option>
+                        <option value="_none">未分类</option>
+                        {allFolders.map((folder) => (
+                          <option key={folder} value={folder}>
+                            {folder}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <span className="text-gray-500 text-xs sm:text-sm sm:ml-auto">
                     {(() => {
                       const filtered = credentials.filter((c) => {
@@ -1200,6 +1257,15 @@ export default function Admin() {
                           return false;
                         if (credStatusFilter === "inactive" && c.is_active)
                           return false;
+                        // 文件夹筛选
+                        if (credFolderFilter !== "all") {
+                          if (credFolderFilter === "_none") {
+                            if (credFolders[c.id]) return false;
+                          } else {
+                            if (credFolders[c.id] !== credFolderFilter)
+                              return false;
+                          }
+                        }
                         return true;
                       });
                       return `显示 ${filtered.length} / ${credentials.length}`;
@@ -1239,6 +1305,15 @@ export default function Admin() {
                             return false;
                           if (credStatusFilter === "inactive" && c.is_active)
                             return false;
+                          // 文件夹筛选
+                          if (credFolderFilter !== "all") {
+                            if (credFolderFilter === "_none") {
+                              if (credFolders[c.id]) return false;
+                            } else {
+                              if (credFolders[c.id] !== credFolderFilter)
+                                return false;
+                            }
+                          }
                           return true;
                         })
                         .slice(
@@ -1274,6 +1349,21 @@ export default function Admin() {
                                   ) : (
                                     <span className="text-gray-600 hover:text-gray-400">
                                       + 添加备注
+                                    </span>
+                                  )}
+                                </button>
+                                {/* 文件夹标签 - 点击编辑 */}
+                                <button
+                                  onClick={() => updateCredFolder(c.id)}
+                                  className="text-left text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1"
+                                >
+                                  {credFolders[c.id] ? (
+                                    <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded">
+                                      📁 {credFolders[c.id]}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-600 hover:text-gray-400">
+                                      + 设置分类
                                     </span>
                                   )}
                                 </button>
