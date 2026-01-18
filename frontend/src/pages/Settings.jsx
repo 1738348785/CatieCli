@@ -98,6 +98,9 @@ export default function Settings() {
         config.oauth_guide_enabled ?? true,
       );
       formData.append("oauth_guide_seconds", config.oauth_guide_seconds ?? 8);
+      formData.append("help_link_enabled", config.help_link_enabled ?? false);
+      formData.append("help_link_url", config.help_link_url || "");
+      formData.append("help_link_text", config.help_link_text || "使用教程");
 
       await api.post("/api/manage/config", formData);
       setMessage({ type: "success", text: "配置已保存！" });
@@ -785,6 +788,73 @@ export default function Settings() {
                   />
                   <p className="text-gray-500 text-sm mt-1">
                     用户需等待此时间才能关闭指引弹窗（0=可立即关闭）
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 帮助链接 */}
+          <div className="pt-4 border-t border-gray-700">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold">📚 帮助链接</h3>
+                <p className="text-gray-400 text-sm">
+                  在侧边栏显示使用教程链接
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config?.help_link_enabled || false}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      help_link_enabled: e.target.checked,
+                    })
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
+            {config?.help_link_enabled && (
+              <div className="mt-4 space-y-4 pl-4 border-l-2 border-cyan-500/30">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    链接文字
+                  </label>
+                  <input
+                    type="text"
+                    value={config?.help_link_text || "使用教程"}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        help_link_text: e.target.value,
+                      })
+                    }
+                    placeholder="使用教程"
+                    className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    链接地址
+                  </label>
+                  <input
+                    type="url"
+                    value={config?.help_link_url || ""}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        help_link_url: e.target.value,
+                      })
+                    }
+                    placeholder="https://..."
+                    className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  />
+                  <p className="text-gray-500 text-sm mt-1">
+                    可设置为视频教程、文档等链接
                   </p>
                 </div>
               </div>

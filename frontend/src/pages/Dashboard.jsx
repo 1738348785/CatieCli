@@ -8,6 +8,7 @@ import {
     Download,
     ExternalLink,
     Gift,
+    HelpCircle,
     LogOut,
     RefreshCcw,
     RefreshCw,
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [helpLink, setHelpLink] = useState(null);
 
   // API Key 相关
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -140,10 +142,20 @@ export default function Dashboard() {
     Promise.all([
       api.get("/api/auth/me").catch(() => null),
       api.get("/api/public/stats").catch(() => null),
+      api.get("/api/manage/public-config").catch(() => null),
     ])
-      .then(([meRes, statsRes]) => {
+      .then(([meRes, statsRes, configRes]) => {
         if (meRes?.data) setUserInfo(meRes.data);
         if (statsRes?.data) setStats(statsRes.data);
+        if (
+          configRes?.data?.help_link_enabled &&
+          configRes?.data?.help_link_url
+        ) {
+          setHelpLink({
+            url: configRes.data.help_link_url,
+            text: configRes.data.help_link_text || "使用教程",
+          });
+        }
       })
       .finally(() => setStatsLoading(false));
   }, []);
@@ -427,6 +439,17 @@ export default function Dashboard() {
               <Rocket size={16} />
               Antigravity 凭证
             </Link>
+            {helpLink && (
+              <a
+                href={helpLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-sm whitespace-nowrap"
+              >
+                <HelpCircle size={16} />
+                {helpLink.text}
+              </a>
+            )}
           </div>
         </div>
       </nav>

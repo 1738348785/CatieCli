@@ -1038,6 +1038,9 @@ async def get_config(user: User = Depends(get_current_admin)):
         "antigravity_contributor_rpm": settings.antigravity_contributor_rpm,
         "oauth_guide_enabled": settings.oauth_guide_enabled,
         "oauth_guide_seconds": settings.oauth_guide_seconds,
+        "help_link_enabled": settings.help_link_enabled,
+        "help_link_url": settings.help_link_url,
+        "help_link_text": settings.help_link_text,
     }
 
 
@@ -1067,6 +1070,9 @@ async def get_public_config():
         "contributor_rpm": settings.contributor_rpm,
         "oauth_guide_enabled": settings.oauth_guide_enabled,
         "oauth_guide_seconds": settings.oauth_guide_seconds,
+        "help_link_enabled": settings.help_link_enabled,
+        "help_link_url": settings.help_link_url,
+        "help_link_text": settings.help_link_text,
     }
 
 
@@ -1113,6 +1119,9 @@ async def update_config(
     antigravity_contributor_rpm: Optional[int] = Form(None),
     oauth_guide_enabled: Optional[bool] = Form(None),
     oauth_guide_seconds: Optional[int] = Form(None),
+    help_link_enabled: Optional[bool] = Form(None),
+    help_link_url: Optional[str] = Form(None),
+    help_link_text: Optional[str] = Form(None),
     user: User = Depends(get_current_admin)
 ):
     """更新配置（持久化保存到数据库）"""
@@ -1296,6 +1305,20 @@ async def update_config(
         settings.oauth_guide_seconds = oauth_guide_seconds
         await save_config_to_db("oauth_guide_seconds", oauth_guide_seconds)
         updated["oauth_guide_seconds"] = oauth_guide_seconds
+    
+    # 帮助链接配置
+    if help_link_enabled is not None:
+        settings.help_link_enabled = help_link_enabled
+        await save_config_to_db("help_link_enabled", help_link_enabled)
+        updated["help_link_enabled"] = help_link_enabled
+    if help_link_url is not None:
+        settings.help_link_url = help_link_url
+        await save_config_to_db("help_link_url", help_link_url)
+        updated["help_link_url"] = help_link_url
+    if help_link_text is not None:
+        settings.help_link_text = help_link_text
+        await save_config_to_db("help_link_text", help_link_text)
+        updated["help_link_text"] = help_link_text
     
     return {"message": "配置已保存", "updated": updated}
 

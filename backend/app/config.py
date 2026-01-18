@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     oauth_guide_enabled: bool = True   # 是否显示操作指引弹窗
     oauth_guide_seconds: int = 8       # 倒计时秒数（0=无倒计时立即可关闭）
 
+    # 帮助文档链接
+    help_link_enabled: bool = False    # 是否显示帮助链接
+    help_link_url: str = ""            # 帮助文档链接地址
+    help_link_text: str = "使用教程"   # 帮助链接显示文字
     
     # Google OAuth (Gemini CLI 官方配置)
     google_client_id: str = "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"
@@ -189,6 +193,9 @@ PERSISTENT_CONFIG_KEYS = [
     "antigravity_contributor_rpm",
     "oauth_guide_enabled",
     "oauth_guide_seconds",
+    "help_link_enabled",
+    "help_link_url",
+    "help_link_text",
 ]
 
 
