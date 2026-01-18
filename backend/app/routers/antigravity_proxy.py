@@ -297,7 +297,7 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
     ]
     
     thinking_suffixes = ["-maxthinking", "-nothinking", "-thinking"]
-    search_suffix = "-search"
+    # search_suffix 已移除 - 反重力API不支持联网搜索
     
     models = []
     for base in base_models:
@@ -312,10 +312,7 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
                 models.append({"id": f"agy-{base}{suffix}", "object": "model", "owned_by": "google"})
                 models.append({"id": f"{base}{suffix}", "object": "model", "owned_by": "google"})
         
-        # 搜索变体 (Gemini 和 Claude 都支持)
-        if base.startswith("gemini") or base.startswith("claude"):
-            models.append({"id": f"agy-{base}{search_suffix}", "object": "model", "owned_by": "google"})
-            models.append({"id": f"{base}{search_suffix}", "object": "model", "owned_by": "google"})
+        # 搜索变体已移除 - 反重力API不支持联网搜索
     
     return {"object": "list", "data": models}
 
