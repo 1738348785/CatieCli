@@ -460,11 +460,11 @@ export default function Dashboard() {
           )}
           {/* Antigravity 入口 - 所有用户可见 */}
           <div
-            className={`flex items-center gap-4 ${user?.is_admin ? "mt-2" : "mt-3 pt-3 border-t border-dark-700"}`}
+            className={`flex items-center gap-2 sm:gap-4 overflow-x-auto pb-2 ${user?.is_admin ? "mt-2" : "mt-3 pt-3 border-t border-dark-700"}`}
           >
             <Link
               to="/antigravity-credentials"
-              className="text-orange-400 hover:text-orange-300 flex items-center gap-1 text-sm whitespace-nowrap"
+              className="text-orange-400 hover:text-orange-300 flex items-center gap-1 text-sm whitespace-nowrap flex-shrink-0"
             >
               <Rocket size={16} />
               Antigravity 凭证
@@ -472,7 +472,7 @@ export default function Dashboard() {
             {anthropicEnabled && (
               <Link
                 to="/anthropic-credentials"
-                className="text-pink-400 hover:text-pink-300 flex items-center gap-1 text-sm whitespace-nowrap"
+                className="text-pink-400 hover:text-pink-300 flex items-center gap-1 text-sm whitespace-nowrap flex-shrink-0"
               >
                 <Key size={16} />
                 Anthropic 凭证
@@ -482,20 +482,26 @@ export default function Dashboard() {
               (helpLink.isInternal ? (
                 <Link
                   to={helpLink.url}
-                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-sm whitespace-nowrap"
+                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-sm flex-shrink-0"
+                  title={helpLink.text}
                 >
-                  <HelpCircle size={16} />
-                  {helpLink.text}
+                  <HelpCircle size={16} className="flex-shrink-0" />
+                  <span className="max-w-[120px] sm:max-w-[200px] truncate">
+                    {helpLink.text}
+                  </span>
                 </Link>
               ) : (
                 <a
                   href={helpLink.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-sm whitespace-nowrap"
+                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-sm flex-shrink-0"
+                  title={helpLink.text}
                 >
-                  <HelpCircle size={16} />
-                  {helpLink.text}
+                  <HelpCircle size={16} className="flex-shrink-0" />
+                  <span className="max-w-[120px] sm:max-w-[200px] truncate">
+                    {helpLink.text}
+                  </span>
                 </a>
               ))}
           </div>
