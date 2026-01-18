@@ -1121,15 +1121,42 @@ export default function Dashboard() {
                         <li>
                           模型:{" "}
                           <span className="text-purple-400">
-                            gemini-2.5-flash
+                            gemini-3.0-flash
                           </span>{" "}
                           或{" "}
                           <span className="text-purple-400">
-                            gemini-2.5-pro
+                            gemini-3.0-pro
                           </span>
                         </li>
                       </ol>
                     </div>
+                  </div>
+
+                  {/* Antigravity 说明 */}
+                  <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                    <div className="text-orange-400 font-medium mb-2 flex items-center gap-2">
+                      <Rocket size={16} />
+                      关于 Antigravity (反重力)
+                    </div>
+                    <ul className="text-orange-300/80 text-sm space-y-1">
+                      <li>
+                        • Antigravity 凭证与 GeminiCLI 凭证是
+                        <span className="text-orange-400">独立的</span>
+                        ，需要单独获取
+                      </li>
+                      <li>
+                        • Antigravity 只支持{" "}
+                        <span className="text-orange-400">OpenAI 兼容接口</span>{" "}
+                        调用
+                      </li>
+                      <li>
+                        • Antigravity 端点:{" "}
+                        <code className="bg-dark-900 px-1 rounded text-orange-400">
+                          /agy/v1
+                        </code>
+                      </li>
+                      <li>• 没有 Antigravity 凭证无法拉取反重力模型</li>
+                    </ul>
                   </div>
                 </div>
               </>
