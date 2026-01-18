@@ -218,7 +218,7 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
                         # 排除条件：包含这些关键字的跳过
                         invalid_patterns = [
                             "chat_", "rev", "tab_", "uic", "test", "exp", "lite_preview",
-                            "2.5", "gemini-2", "gcli-"
+                            "2.5", "gemini-2", "gcli-", "search"  # search模型反重力不支持
                         ]
                         for pattern in invalid_patterns:
                             if pattern in model_lower:
