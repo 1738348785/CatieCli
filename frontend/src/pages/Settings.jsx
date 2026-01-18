@@ -117,6 +117,7 @@ export default function Settings() {
         config.anthropic_quota_default ?? 100,
       );
       formData.append("anthropic_base_rpm", config.anthropic_base_rpm ?? 10);
+      formData.append("stats_timezone", config.stats_timezone ?? "server");
 
       await api.post("/api/manage/config", formData);
       setMessage({ type: "success", text: "配置已保存！" });
@@ -1222,6 +1223,34 @@ You are Antigravity, a powerful agentic AI coding assistant designed by the Goog
                 </div>
               </div>
             )}
+          </div>
+
+          {/* 统计时区设置 */}
+          <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              🕐 统计时区
+            </h3>
+            <div>
+              <label className="text-sm text-gray-400 mb-1 block">
+                今日使用统计重置时区
+              </label>
+              <select
+                value={config?.stats_timezone ?? "server"}
+                onChange={(e) =>
+                  setConfig({ ...config, stats_timezone: e.target.value })
+                }
+                className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="server">服务器时区（跟随服务器系统时间）</option>
+                <option value="utc">UTC 时区（北京时间下午 4 点重置）</option>
+                <option value="utc8">
+                  北京时间 UTC+8（北京时间 0 点重置）
+                </option>
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                影响"今日使用"统计的重置时间
+              </p>
+            </div>
           </div>
 
           {/* 保存按钮 */}

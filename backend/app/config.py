@@ -154,6 +154,9 @@ You are Antigravity, a powerful agentic AI coding assistant designed by the Goog
     anthropic_base_rpm: int = 10                   # 默认 RPM
     anthropic_contributor_rpm: int = 20            # 贡献者 RPM
     
+    # 统计时区设置 (server=服务器时区, utc=UTC, utc8=北京时间)
+    stats_timezone: str = "server"
+    
     # Discord OAuth (可选，用于 Discord 登录/注册)
     discord_client_id: str = ""
     discord_client_secret: str = ""
@@ -218,6 +221,7 @@ PERSISTENT_CONFIG_KEYS = [
     "anthropic_quota_contributor",
     "anthropic_base_rpm",
     "anthropic_contributor_rpm",
+    "stats_timezone",
 ]
 
 

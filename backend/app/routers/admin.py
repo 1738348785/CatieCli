@@ -45,7 +45,16 @@ async def list_users(
         return {"users": [], "total": 0}
     
     user_ids = [u.id for u in users]
-    today = date.today()
+    
+    # 根据 stats_timezone 配置计算今日日期
+    from datetime import datetime, timezone, timedelta
+    if settings.stats_timezone == "utc":
+        today = datetime.now(timezone.utc).date()
+    elif settings.stats_timezone == "utc8":
+        utc8 = timezone(timedelta(hours=8))
+        today = datetime.now(utc8).date()
+    else:  # server (默认)
+        today = date.today()
     
     # 2. 批量查询今日使用量
     usage_result = await db.execute(
