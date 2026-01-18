@@ -624,115 +624,69 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 按 Provider 分类统计 */}
-            <div className="grid md:grid-cols-3 gap-4 mb-6">
+            {/* 按 Provider 分类统计 + CLI vs AGY 总览 */}
+            <div className="grid md:grid-cols-4 gap-4 mb-6">
               {/* Claude */}
-              <div className="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border border-amber-700/30 rounded-xl p-5">
+              <div className="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border border-amber-700/30 rounded-xl p-4">
                 <div className="text-center">
-                  <div className="text-sm text-amber-400 mb-2 font-medium flex items-center justify-center gap-1">
+                  <div className="text-sm text-amber-400 mb-1 font-medium">
                     🚀 AGY Claude
                   </div>
-                  <div className="text-3xl font-bold text-amber-300 mb-2">
+                  <div className="text-2xl font-bold text-amber-300">
                     {userInfo?.usage_by_provider?.claude || 0}
-                    <span className="text-lg text-gray-500 ml-1">次</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 text-xs">
-                    <span className="text-blue-400">
-                      CLI:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.claude || 0) *
-                          (userInfo?.usage_by_api_type?.cli || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
-                    <span className="text-orange-400">
-                      AGY:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.claude || 0) *
-                          (userInfo?.usage_by_api_type?.antigravity || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
+                    <span className="text-sm text-gray-500 ml-1">次</span>
                   </div>
                 </div>
               </div>
 
               {/* Gemini */}
-              <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/10 border border-blue-700/30 rounded-xl p-5">
+              <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/10 border border-blue-700/30 rounded-xl p-4">
                 <div className="text-center">
-                  <div className="text-sm text-blue-400 mb-2 font-medium flex items-center justify-center gap-1">
+                  <div className="text-sm text-blue-400 mb-1 font-medium">
                     🚀 AGY Gemini
                   </div>
-                  <div className="text-3xl font-bold text-blue-300 mb-2">
+                  <div className="text-2xl font-bold text-blue-300">
                     {userInfo?.usage_by_provider?.gemini || 0}
-                    <span className="text-lg text-gray-500 ml-1">次</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 text-xs">
-                    <span className="text-blue-400">
-                      CLI:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.gemini || 0) *
-                          (userInfo?.usage_by_api_type?.cli || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
-                    <span className="text-orange-400">
-                      AGY:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.gemini || 0) *
-                          (userInfo?.usage_by_api_type?.antigravity || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
+                    <span className="text-sm text-gray-500 ml-1">次</span>
                   </div>
                 </div>
               </div>
 
               {/* 其他 */}
-              <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 border border-gray-600/30 rounded-xl p-5">
+              <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 border border-gray-600/30 rounded-xl p-4">
                 <div className="text-center">
-                  <div className="text-sm text-gray-400 mb-2 font-medium flex items-center justify-center gap-1">
+                  <div className="text-sm text-gray-400 mb-1 font-medium">
                     🚀 AGY 其他
                   </div>
-                  <div className="text-3xl font-bold text-gray-300 mb-2">
+                  <div className="text-2xl font-bold text-gray-300">
                     {userInfo?.usage_by_provider?.other || 0}
-                    <span className="text-lg text-gray-500 ml-1">次</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 text-xs">
-                    <span className="text-blue-400">
-                      CLI:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.other || 0) *
-                          (userInfo?.usage_by_api_type?.cli || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
-                    <span className="text-orange-400">
-                      AGY:{" "}
-                      {Math.round(
-                        ((userInfo?.usage_by_provider?.other || 0) *
-                          (userInfo?.usage_by_api_type?.antigravity || 0)) /
-                          Math.max(1, userInfo?.today_usage || 1),
-                      )}
-                    </span>
+                    <span className="text-sm text-gray-500 ml-1">次</span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* CLI vs Antigravity 总览 */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-blue-400">
-                  {userInfo?.usage_by_api_type?.cli || 0}
+              {/* CLI vs AGY 合并框 */}
+              <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/10 border border-purple-700/30 rounded-xl p-4">
+                <div className="text-center">
+                  <div className="text-sm text-purple-400 mb-1 font-medium">
+                    📊 API 调用
+                  </div>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-400">
+                        {userInfo?.usage_by_api_type?.cli || 0}
+                      </div>
+                      <div className="text-xs text-gray-500">CLI</div>
+                    </div>
+                    <div className="text-gray-600">/</div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-orange-400">
+                        {userInfo?.usage_by_api_type?.antigravity || 0}
+                      </div>
+                      <div className="text-xs text-gray-500">AGY</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400 mt-1">🖥️ CLI 调用</div>
-              </div>
-              <div className="bg-orange-900/20 border border-orange-700/30 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-orange-400">
-                  {userInfo?.usage_by_api_type?.antigravity || 0}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">🚀 AGY 调用</div>
               </div>
             </div>
 
