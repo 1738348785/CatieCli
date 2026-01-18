@@ -1611,6 +1611,20 @@ async def get_global_stats(
         )
     )
     
+    # CLI 凭证（api_type 为空、None 或 'geminicli'）
+    cli_creds = await db.execute(
+        select(func.count(Credential.id))
+        .where(Credential.is_active == True)
+        .where((Credential.api_type == None) | (Credential.api_type == "") | (Credential.api_type == "geminicli"))
+    )
+    
+    # AGY 凭证（api_type = "antigravity"）
+    agy_creds = await db.execute(
+        select(func.count(Credential.id))
+        .where(Credential.is_active == True)
+        .where(Credential.api_type == "antigravity")
+    )
+    
     # 配额计算专用：统计公共凭证总数（不管是否冷却），避免配额越算越少
     public_creds_for_quota = await db.execute(
         select(func.count(Credential.id)).where(Credential.is_public == True)
@@ -1769,6 +1783,8 @@ async def get_global_stats(
             "tier_3": tier3_creds,
             "pro": pro_creds,
             "free": free_creds,
+            "cli": cli_creds.scalar() or 0,
+            "agy": agy_creds.scalar() or 0,
         },
         "users": {
             "active_24h": active_users,
