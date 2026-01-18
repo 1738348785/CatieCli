@@ -171,19 +171,27 @@ async def public_stats():
             select(func.count(Credential.id)).where(Credential.is_active == True)
         )).scalar() or 0
         
-        # CLI 凭证（api_type 为空、None 或 'geminicli'）
-        cli_credentials = (await db.execute(
-            select(func.count(Credential.id))
-            .where(Credential.is_active == True)
-            .where((Credential.api_type == None) | (Credential.api_type == "") | (Credential.api_type == "geminicli"))
-        )).scalar() or 0
-        
-        # AGY 凭证（api_type = "antigravity"）
-        agy_credentials = (await db.execute(
-            select(func.count(Credential.id))
-            .where(Credential.is_active == True)
-            .where(Credential.api_type == "antigravity")
-        )).scalar() or 0
+        # CLI/AGY 凭证统计（兼容旧数据库，可能没有 api_type 列）
+        cli_credentials = 0
+        agy_credentials = 0
+        try:
+            # CLI 凭证（api_type 为空、None 或 'geminicli'）
+            cli_credentials = (await db.execute(
+                select(func.count(Credential.id))
+                .where(Credential.is_active == True)
+                .where((Credential.api_type == None) | (Credential.api_type == "") | (Credential.api_type == "geminicli"))
+            )).scalar() or 0
+            
+            # AGY 凭证（api_type = "antigravity"）
+            agy_credentials = (await db.execute(
+                select(func.count(Credential.id))
+                .where(Credential.is_active == True)
+                .where(Credential.api_type == "antigravity")
+            )).scalar() or 0
+        except Exception:
+            # 旧数据库可能没有 api_type 列，降级处理
+            cli_credentials = active_credentials
+            agy_credentials = 0
         
         today = date.today()
         today_requests = (await db.execute(
