@@ -337,6 +337,17 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
                         if variant not in existing_ids:
                             models.append({"id": variant, "object": "model", "owned_by": "google"})
                             print(f"[Models] ✅ 强制添加 Claude 模型变体: {variant}", flush=True)
+                    
+                    # 强制添加 Gemini 2.5 系列模型（反重力API动态列表可能不包含）
+                    gemini_25_variants = [
+                        "agy-gemini-2.5-flash", "agy-gemini-2.5-flash-lite", 
+                        "agy-gemini-2.5-pro", "agy-gemini-2.5-flash-thinking",
+                    ]
+                    existing_ids = {m["id"] for m in models}
+                    for variant in gemini_25_variants:
+                        if variant not in existing_ids:
+                            models.append({"id": variant, "object": "model", "owned_by": "google"})
+                            print(f"[Models] ✅ 强制添加 Gemini 2.5 模型: {variant}", flush=True)
         except Exception as e:
             print(f"[Models] 获取 Antigravity 模型列表失败: {e}", flush=True)
             # 降级：使用静态模型列表
