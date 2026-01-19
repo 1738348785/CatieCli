@@ -456,7 +456,7 @@ async def check_duplicate_credentials(
     from app.services.crypto import decrypt_credential
     from collections import defaultdict
     
-    # 获取所有凭证
+    # 获取所有凭证（按 api_type 分组检测，不同类型的凭证不算重复）
     result = await db.execute(
         select(Credential, User.username)
         .outerjoin(User, Credential.user_id == User.id)
@@ -464,9 +464,9 @@ async def check_duplicate_credentials(
     )
     rows = result.all()
     
-    # 按邮箱分组
+    # 按 (api_type, 邮箱) 分组 - 不同 api_type 的相同邮箱不算重复
     email_groups = defaultdict(list)
-    # 按 refresh_token 分组
+    # 按 (api_type, refresh_token) 分组
     token_groups = defaultdict(list)
     
     for row in rows:
@@ -486,9 +486,10 @@ async def check_duplicate_credentials(
             "created_at": c.created_at.isoformat() if c.created_at else None
         }
         
-        # 按邮箱分组
+        # 按 (api_type, 邮箱) 分组 - 不同 api_type 的相同邮箱不算重复
+        api_type = c.api_type or "geminicli"
         if c.email:
-            email_groups[c.email].append(cred_info)
+            email_groups[(api_type, c.email)].append(cred_info)
         
         # 按 refresh_token 分组（解密后比较）
         if c.refresh_token:
@@ -497,7 +498,7 @@ async def check_duplicate_credentials(
                 # 只取前50字符作为key，避免太长
                 token_key = token[:50] if token else None
                 if token_key:
-                    token_groups[token_key].append(cred_info)
+                    token_groups[(api_type, token_key)].append(cred_info)
             except:
                 pass
     
@@ -509,17 +510,17 @@ async def check_duplicate_credentials(
     all_duplicate_ids = set()
     duplicates = []
     
-    for email, creds in duplicate_emails.items():
+    for (api_type, email), creds in duplicate_emails.items():
         for cred in creds:
             if cred["id"] not in all_duplicate_ids:
                 all_duplicate_ids.add(cred["id"])
         duplicates.append({
             "type": "email",
-            "key": email,
+            "key": f"{email} ({api_type})",
             "credentials": creds
         })
     
-    for token_key, creds in duplicate_tokens.items():
+    for (api_type, token_key), creds in duplicate_tokens.items():
         # 检查是否已经被邮箱重复覆盖
         ids = [c["id"] for c in creds]
         if not all(id in all_duplicate_ids for id in ids):
@@ -527,7 +528,7 @@ async def check_duplicate_credentials(
                 all_duplicate_ids.add(cred["id"])
             duplicates.append({
                 "type": "token",
-                "key": f"{token_key[:20]}...",
+                "key": f"{token_key[:20]}... ({api_type})",
                 "credentials": creds
             })
     
@@ -553,23 +554,24 @@ async def delete_duplicate_credentials(
     )
     credentials = result.scalars().all()
     
-    # 按邮箱分组（存储完整凭证对象以便判断is_active）
+    # 按 (api_type, 邮箱) 分组 - 不同 api_type 的相同邮箱不算重复
     email_groups = defaultdict(list)
-    # 按 refresh_token 分组
+    # 按 (api_type, refresh_token) 分组
     token_groups = defaultdict(list)
     
     for c in credentials:
-        # 按邮箱分组
+        api_type = c.api_type or "geminicli"
+        # 按 (api_type, 邮箱) 分组
         if c.email:
-            email_groups[c.email].append(c)
+            email_groups[(api_type, c.email)].append(c)
         
-        # 按 refresh_token 分组
+        # 按 (api_type, refresh_token) 分组
         if c.refresh_token:
             try:
                 token = decrypt_credential(c.refresh_token)
                 token_key = token[:50] if token else None
                 if token_key:
-                    token_groups[token_key].append(c)
+                    token_groups[(api_type, token_key)].append(c)
             except:
                 pass
     
@@ -588,7 +590,7 @@ async def delete_duplicate_credentials(
     ids_to_delete = set()
     ids_to_keep = set()
     
-    for email, creds in email_groups.items():
+    for (api_type, email), creds in email_groups.items():
         if len(creds) > 1:
             keep_id = select_best_credential(creds)
             ids_to_keep.add(keep_id)
@@ -596,7 +598,7 @@ async def delete_duplicate_credentials(
                 if c.id != keep_id:
                     ids_to_delete.add(c.id)
     
-    for token_key, creds in token_groups.items():
+    for (api_type, token_key), creds in token_groups.items():
         if len(creds) > 1:
             keep_id = select_best_credential(creds)
             ids_to_keep.add(keep_id)

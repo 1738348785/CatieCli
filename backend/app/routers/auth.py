@@ -152,11 +152,14 @@ async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depe
     )
     pro25_usage = pro25_result.scalar() or 0
     
+    # 3.0 模型用量：包含 "3" 但排除 3-flash（3-flash 算 flash 额度）
     pro30_result = await db.execute(
         select(func.count(UsageLog.id))
         .where(UsageLog.user_id == user.id)
         .where(UsageLog.created_at >= start_of_day)
         .where(UsageLog.model.like('%3%'))
+        .where(UsageLog.model.notlike('%3-flash%'))  # 排除 gemini-3-flash
+        .where(UsageLog.model.notlike('%3flash%'))   # 排除没有连字符的变体
     )
     pro30_usage = pro30_result.scalar() or 0
     
