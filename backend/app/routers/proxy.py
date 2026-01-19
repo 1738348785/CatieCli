@@ -387,7 +387,7 @@ async def chat_completions(
     路由规则：
     - agy-xxx 前缀 → Antigravity 代理
     - gcli-xxx 前缀或无前缀 → GeminiCLI 代理
-    - 流式前缀（假非流/、流式抗截断/）保留，由对应代理处理
+    - 流式前缀（假流/假非流/、流式抗截断/）保留，由对应代理处理
     """
     try:
         body = await request.json()
@@ -397,9 +397,14 @@ async def chat_completions(
     model = body.get("model", "gemini-2.5-flash")
     
     # 提取流式前缀（如果有）
+    # 假流/ = gcli 假流式（发心跳，收完整响应后返回流式）
+    # 假非流/ = agy 假非流（发心跳，收完整响应后返回JSON）
     stream_prefix = ""
     model_without_stream = model
-    if model.startswith("假非流/"):
+    if model.startswith("假流/"):
+        stream_prefix = "假流/"
+        model_without_stream = model[3:]  # len("假流/") = 3
+    elif model.startswith("假非流/"):
         stream_prefix = "假非流/"
         model_without_stream = model[4:]  # len("假非流/") = 4
     elif model.startswith("流式抗截断/"):
@@ -897,14 +902,14 @@ async def list_gemini_models(request: Request, user: User = Depends(get_user_fro
             # 基础模型
             models.append(make_gemini_model(f"gcli-{base}"))
             
-            # 假流式变体
-            models.append(make_gemini_model(f"gcli-假非流/{base}"))
+            # 假流式变体（gcli 有假流，没有假非流）
+            models.append(make_gemini_model(f"gcli-假流/{base}"))
             
             # thinking 变体
             for suffix in thinking_suffixes:
                 models.append(make_gemini_model(f"gcli-{base}{suffix}"))
                 # thinking + 假流式
-                models.append(make_gemini_model(f"gcli-假非流/{base}{suffix}"))
+                models.append(make_gemini_model(f"gcli-假流/{base}{suffix}"))
             
             # search 变体
             models.append(make_gemini_model(f"gcli-{base}{search_suffix}"))
