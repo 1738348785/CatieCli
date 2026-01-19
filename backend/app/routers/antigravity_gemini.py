@@ -179,14 +179,12 @@ async def gemini_generate_content(
         await db.commit()
         raise HTTPException(status_code=503, detail="Token 刷新失败或无 project_id")
     
-    # 规范化请求
-    body["model"] = real_model
+    # 规范化请求 - 使用与 AntigravityClient.generate_content 相同的逻辑
+    body["model"] = model  # 保留完整模型名（含 -high/-low 等后缀）用于 thinking 配置
     try:
         normalized_request = await normalize_gemini_request(body, mode="antigravity")
-        api_request = {
-            "model": normalized_request.pop("model", real_model),
-            "request": normalized_request
-        }
+        # normalized_request 中包含处理后的 model（可能被映射）
+        final_model = normalized_request.pop("model", real_model)
     except Exception as e:
         placeholder_log.status_code = 400
         placeholder_log.error_message = str(e)[:2000]
@@ -199,14 +197,16 @@ async def gemini_generate_content(
         try:
             async with client._get_client() as http_client:
                 url = client.get_generate_url()
-                headers = client.get_headers(real_model)
+                headers = client.get_headers(final_model)
                 
-                # 构建完整的请求 payload
+                # 构建完整的请求 payload - 与 AntigravityClient.generate_content 保持一致
                 payload = {
-                    "model": api_request.get("model", real_model),
+                    "model": final_model,
                     "project": project_id,
-                    "request": api_request.get("request", api_request)
+                    "request": normalized_request
                 }
+                
+                print(f"[AntigravityGemini] 非流式请求 - model: {final_model}, url: {url}", flush=True)
                 
                 response = await http_client.post(
                     url,
@@ -359,14 +359,11 @@ async def gemini_stream_generate_content(
         await db.commit()
         raise HTTPException(status_code=503, detail="Token 刷新失败或无 project_id")
     
-    # 规范化请求
-    body["model"] = real_model
+    # 规范化请求 - 使用与 AntigravityClient.generate_content 相同的逻辑
+    body["model"] = model  # 保留完整模型名（含 -high/-low 等后缀）用于 thinking 配置
     try:
         normalized_request = await normalize_gemini_request(body, mode="antigravity")
-        api_request = {
-            "model": normalized_request.pop("model", real_model),
-            "request": normalized_request
-        }
+        final_model = normalized_request.pop("model", real_model)
     except Exception as e:
         placeholder_log.status_code = 400
         placeholder_log.error_message = str(e)[:2000]
@@ -387,13 +384,13 @@ async def gemini_stream_generate_content(
             try:
                 async with client._get_client() as http_client:
                     url = client.get_generate_url()
-                    headers = client.get_headers(real_model)
+                    headers = client.get_headers(final_model)
                     
                     # 构建完整的请求 payload
                     payload = {
-                        "model": api_request.get("model", real_model),
+                        "model": final_model,
                         "project": project_id,
-                        "request": api_request.get("request", api_request)
+                        "request": normalized_request
                     }
                     
                     response = await http_client.post(
@@ -478,14 +475,16 @@ async def gemini_stream_generate_content(
             try:
                 async with client._get_client() as http_client:
                     url = client.get_stream_url()
-                    headers = client.get_headers(real_model)
+                    headers = client.get_headers(final_model)
                     
                     # 构建完整的请求 payload
                     payload = {
-                        "model": api_request.get("model", real_model),
+                        "model": final_model,
                         "project": project_id,
-                        "request": api_request.get("request", api_request)
+                        "request": normalized_request
                     }
+                    
+                    print(f"[AntigravityGemini] 流式请求 - model: {final_model}, url: {url}", flush=True)
                     
                     async with http_client.stream(
                         "POST",
