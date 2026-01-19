@@ -230,7 +230,9 @@ class AntigravityClient:
         model: str,
         contents: list,
         generation_config: Optional[Dict] = None,
-        system_instruction: Optional[Dict] = None
+        system_instruction: Optional[Dict] = None,
+        tools: Optional[List] = None,
+        tool_config: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """生成内容 (非流式) - 使用 Antigravity API，完全复制 gcli2api 逻辑"""
         url = f"{self.api_base}/v1internal:generateContent"
@@ -249,6 +251,10 @@ class AntigravityClient:
         }
         if system_instruction:
             gemini_request["systemInstruction"] = system_instruction
+        if tools:
+            gemini_request["tools"] = tools
+        if tool_config:
+            gemini_request["toolConfig"] = tool_config
         
         # 调用 gcli2api 完整的规范化函数
         normalized = await normalize_gemini_request(gemini_request, mode="antigravity")
@@ -299,7 +305,9 @@ class AntigravityClient:
         model: str,
         contents: list,
         generation_config: Optional[Dict] = None,
-        system_instruction: Optional[Dict] = None
+        system_instruction: Optional[Dict] = None,
+        tools: Optional[List] = None,
+        tool_config: Optional[Dict] = None
     ) -> AsyncGenerator[str, None]:
         """生成内容 (流式) - 使用 Antigravity API，完全复制 gcli2api 逻辑"""
         url = f"{self.api_base}/v1internal:streamGenerateContent?alt=sse"
@@ -318,6 +326,10 @@ class AntigravityClient:
         }
         if system_instruction:
             gemini_request["systemInstruction"] = system_instruction
+        if tools:
+            gemini_request["tools"] = tools
+        if tool_config:
+            gemini_request["toolConfig"] = tool_config
         
         # 调用 gcli2api 完整的规范化函数
         normalized = await normalize_gemini_request(gemini_request, mode="antigravity")
@@ -343,6 +355,26 @@ class AntigravityClient:
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         yield line[6:]
+    
+    async def stream_generate_content(
+        self,
+        model: str,
+        contents: list,
+        generation_config: Optional[Dict] = None,
+        system_instruction: Optional[Dict] = None,
+        tools: Optional[List] = None,
+        tool_config: Optional[Dict] = None
+    ) -> AsyncGenerator[bytes, None]:
+        """生成内容 (流式) - 返回 bytes (SSE 格式)，用于 Anthropic 等格式转换"""
+        async for chunk in self.generate_content_stream(
+            model=model,
+            contents=contents,
+            generation_config=generation_config,
+            system_instruction=system_instruction,
+            tools=tools,
+            tool_config=tool_config
+        ):
+            yield f"data: {chunk}\n\n".encode('utf-8')
     
     async def fetch_available_models(self) -> List[Dict[str, Any]]:
         """获取可用模型列表"""
