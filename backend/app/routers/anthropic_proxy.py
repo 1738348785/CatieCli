@@ -127,7 +127,149 @@ async def list_models(
     }
 
 
-# ===== Chat Completions =====
+# ===== Messages API (Anthropic 原生格式) =====
+
+@router.post("/v1/messages")
+@router.post("/messages")
+async def messages_api(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_user_from_api_key),
+    db: AsyncSession = Depends(get_db)
+):
+    """Anthropic Messages API (原生格式)"""
+    # 获取用户的 Anthropic 凭证
+    credential = await get_user_anthropic_credential(user.id, db)
+    if not credential:
+        raise HTTPException(status_code=400, detail="您没有可用的 Anthropic API Key，请先添加")
+    
+    return await forward_messages_api(request, background_tasks, user, db, credential)
+
+
+async def forward_messages_api(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User,
+    db: AsyncSession,
+    credential: Credential
+):
+    """转发 Messages API 请求到 Anthropic 官方"""
+    try:
+        body = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="无效的请求体")
+    
+    stream = body.get("stream", False)
+    
+    headers = {
+        "x-api-key": credential.api_key,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+    }
+    
+    if stream:
+        async def stream_generator():
+            try:
+                async with httpx.AsyncClient(timeout=300) as client:
+                    async with client.stream(
+                        "POST",
+                        f"{ANTHROPIC_API_BASE}/v1/messages",
+                        headers=headers,
+                        json=body
+                    ) as response:
+                        if response.status_code != 200:
+                            error_text = await response.aread()
+                            yield f"data: {json.dumps({'error': error_text.decode()})}\n\n"
+                            return
+                        
+                        async for line in response.aiter_lines():
+                            if line:
+                                yield f"{line}\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            finally:
+                credential.use_count = (credential.use_count or 0) + 1
+                credential.last_used_at = datetime.utcnow()
+                await db.commit()
+        
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        )
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                response = await client.post(
+                    f"{ANTHROPIC_API_BASE}/v1/messages",
+                    headers=headers,
+                    json=body
+                )
+                
+                credential.use_count = (credential.use_count or 0) + 1
+                credential.last_used_at = datetime.utcnow()
+                await db.commit()
+                
+                if response.status_code != 200:
+                    raise HTTPException(status_code=response.status_code, detail=response.text)
+                
+                return JSONResponse(content=response.json())
+                
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"请求 Anthropic API 失败: {str(e)}")
+
+
+@router.post("/v1/messages/count_tokens")
+@router.post("/messages/count_tokens")
+async def count_tokens_api(
+    request: Request,
+    user: User = Depends(get_user_from_api_key),
+    db: AsyncSession = Depends(get_db)
+):
+    """Anthropic Token 计数 API"""
+    credential = await get_user_anthropic_credential(user.id, db)
+    if not credential:
+        raise HTTPException(status_code=400, detail="您没有可用的 Anthropic API Key，请先添加")
+    
+    return await forward_count_tokens_api(request, user, db, credential)
+
+
+async def forward_count_tokens_api(
+    request: Request,
+    user: User,
+    db: AsyncSession,
+    credential: Credential
+):
+    """转发 Token 计数请求到 Anthropic 官方"""
+    try:
+        body = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="无效的请求体")
+    
+    headers = {
+        "x-api-key": credential.api_key,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                f"{ANTHROPIC_API_BASE}/v1/messages/count_tokens",
+                headers=headers,
+                json=body
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+            
+            return JSONResponse(content=response.json())
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"请求 Anthropic API 失败: {str(e)}")
+
+
+# ===== Chat Completions (OpenAI 兼容) =====
 
 @router.post("/v1/chat/completions")
 @router.post("/chat/completions")

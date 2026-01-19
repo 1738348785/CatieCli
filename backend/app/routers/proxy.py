@@ -190,6 +190,8 @@ async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get
 
 @router.options("/v1/chat/completions")
 @router.options("/v1/models")
+@router.options("/v1/messages")
+@router.options("/v1/messages/count_tokens")
 async def options_handler():
     """处理 CORS 预检请求"""
     return JSONResponse(content={}, headers={
@@ -197,6 +199,173 @@ async def options_handler():
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "*",
     })
+
+
+# ===== Anthropic Claude API 端点 =====
+# /v1/messages 是 Anthropic 官方 API 端点
+# 根据模型名前缀判断使用哪个后端：
+#   - agy-xxx → Antigravity
+#   - claude-xxx → Anthropic 官方（如果有凭证）或降级到 Antigravity
+
+@router.post("/v1/messages")
+async def anthropic_messages_proxy(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_user_from_api_key),
+    db: AsyncSession = Depends(get_db)
+):
+    """Anthropic Messages API 智能路由
+    
+    根据模型名前缀判断：
+    - agy-xxx → 强制使用 Antigravity
+    - claude-xxx → 优先使用 Anthropic 官方，没有凭证则降级到 Antigravity
+    """
+    from app.models.user import Credential
+    from sqlalchemy import or_
+    
+    # 解析请求体获取模型名
+    try:
+        body = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="无效的JSON请求体")
+    
+    model = body.get("model", "claude-sonnet-4-5")
+    
+    # 判断模型前缀
+    use_antigravity = model.startswith("agy-")
+    
+    if use_antigravity:
+        # agy- 前缀 → 强制使用 Antigravity
+        if not settings.antigravity_enabled:
+            raise HTTPException(status_code=503, detail="Antigravity API 功能已禁用")
+        
+        # 检查是否有 Antigravity 凭证
+        agy_cred_result = await db.execute(
+            select(func.count(Credential.id))
+            .where(Credential.api_type == "antigravity")
+            .where(Credential.is_active == True)
+            .where(or_(
+                Credential.user_id == user.id,
+                Credential.is_public == True
+            ))
+        )
+        has_agy_cred = (agy_cred_result.scalar() or 0) > 0
+        
+        if not has_agy_cred:
+            raise HTTPException(status_code=400, detail="您没有可用的 Antigravity 凭证")
+        
+        from app.routers.antigravity_anthropic import anthropic_messages
+        return await anthropic_messages(request, background_tasks, user, db)
+    
+    else:
+        # 非 agy- 前缀（如 claude-xxx）→ 优先 Anthropic 官方
+        
+        # 1. 检查用户是否有 Anthropic 官方凭证
+        anthropic_cred_result = await db.execute(
+            select(Credential)
+            .where(Credential.api_type == "anthropic")
+            .where(Credential.is_active == True)
+            .where(Credential.user_id == user.id)
+            .limit(1)
+        )
+        anthropic_cred = anthropic_cred_result.scalar_one_or_none()
+        
+        if anthropic_cred:
+            # 有 Anthropic 官方凭证 → 转发到 Anthropic 官方 API
+            if not settings.anthropic_enabled:
+                raise HTTPException(status_code=503, detail="Anthropic API 功能未启用")
+            
+            from app.routers.anthropic_proxy import forward_messages_api
+            return await forward_messages_api(request, background_tasks, user, db, anthropic_cred)
+        
+        # 2. 没有 Anthropic 凭证 → 降级到 Antigravity
+        if settings.antigravity_enabled:
+            agy_cred_result = await db.execute(
+                select(func.count(Credential.id))
+                .where(Credential.api_type == "antigravity")
+                .where(Credential.is_active == True)
+                .where(or_(
+                    Credential.user_id == user.id,
+                    Credential.is_public == True
+                ))
+            )
+            has_agy_cred = (agy_cred_result.scalar() or 0) > 0
+            
+            if has_agy_cred:
+                from app.routers.antigravity_anthropic import anthropic_messages
+                return await anthropic_messages(request, background_tasks, user, db)
+        
+        # 3. 都没有 → 返回错误
+        raise HTTPException(
+            status_code=400,
+            detail="您没有可用的 Claude API 凭证。请添加 Anthropic API Key 或 Antigravity 凭证。"
+        )
+
+
+@router.post("/v1/messages/count_tokens")
+async def anthropic_count_tokens_proxy(
+    request: Request,
+    user: User = Depends(get_user_from_api_key),
+    db: AsyncSession = Depends(get_db)
+):
+    """Anthropic Token 计数 API 智能路由"""
+    from app.models.user import Credential
+    from sqlalchemy import or_
+    
+    # 解析请求体获取模型名
+    try:
+        body = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="无效的JSON请求体")
+    
+    model = body.get("model", "claude-sonnet-4-5")
+    use_antigravity = model.startswith("agy-")
+    
+    if use_antigravity:
+        if not settings.antigravity_enabled:
+            raise HTTPException(status_code=503, detail="Antigravity API 功能已禁用")
+        
+        from app.routers.antigravity_anthropic import anthropic_count_tokens
+        return await anthropic_count_tokens(request, user, db)
+    
+    # 非 agy- 前缀 → 优先 Anthropic 官方
+    anthropic_cred_result = await db.execute(
+        select(Credential)
+        .where(Credential.api_type == "anthropic")
+        .where(Credential.is_active == True)
+        .where(Credential.user_id == user.id)
+        .limit(1)
+    )
+    anthropic_cred = anthropic_cred_result.scalar_one_or_none()
+    
+    if anthropic_cred:
+        if not settings.anthropic_enabled:
+            raise HTTPException(status_code=503, detail="Anthropic API 功能未启用")
+        
+        from app.routers.anthropic_proxy import forward_count_tokens_api
+        return await forward_count_tokens_api(request, user, db, anthropic_cred)
+    
+    # 降级到 Antigravity
+    if settings.antigravity_enabled:
+        agy_cred_result = await db.execute(
+            select(func.count(Credential.id))
+            .where(Credential.api_type == "antigravity")
+            .where(Credential.is_active == True)
+            .where(or_(
+                Credential.user_id == user.id,
+                Credential.is_public == True
+            ))
+        )
+        has_agy_cred = (agy_cred_result.scalar() or 0) > 0
+        
+        if has_agy_cred:
+            from app.routers.antigravity_anthropic import anthropic_count_tokens
+            return await anthropic_count_tokens(request, user, db)
+    
+    raise HTTPException(
+        status_code=400,
+        detail="您没有可用的 Claude API 凭证。请添加 Anthropic API Key 或 Antigravity 凭证。"
+    )
 
 
 @router.get("/v1/models")
@@ -207,11 +376,70 @@ async def list_models(request: Request, user: User = Depends(get_user_from_api_k
     - 有 GeminiCLI 凭证：显示 gcli- 前缀模型
     - 有 Antigravity 凭证：显示 agy- 前缀模型
     - 没有任何凭证：不显示任何模型
+    - 如果是 Anthropic 客户端（通过 anthropic-version header 检测）：只显示 Claude 模型
     """
     from app.models.user import Credential
     from sqlalchemy import or_
     
     models = []
+    
+    # ===== 检测是否是 Anthropic 客户端请求 =====
+    # Anthropic 客户端会发送 anthropic-version header
+    is_anthropic_client = request.headers.get("anthropic-version") is not None
+    
+    if is_anthropic_client:
+        # Anthropic 客户端：只返回 Claude 模型
+        # 检查用户是否有 Anthropic 官方凭证或 Antigravity 凭证
+        
+        # 检查 Anthropic 官方凭证
+        anthropic_creds_result = await db.execute(
+            select(func.count(Credential.id))
+            .where(Credential.api_type == "anthropic")
+            .where(Credential.is_active == True)
+            .where(Credential.user_id == user.id)
+        )
+        has_anthropic_creds = (anthropic_creds_result.scalar() or 0) > 0
+        
+        # 检查 Antigravity 凭证
+        agy_creds_result = await db.execute(
+            select(func.count(Credential.id))
+            .where(Credential.api_type == "antigravity")
+            .where(Credential.is_active == True)
+            .where(or_(
+                Credential.user_id == user.id,
+                Credential.is_public == True
+            ))
+        )
+        has_agy_creds = (agy_creds_result.scalar() or 0) > 0
+        
+        # Anthropic 官方 Claude 模型（仅当有 Anthropic 凭证时显示）
+        if has_anthropic_creds and settings.anthropic_enabled:
+            from app.routers.anthropic_proxy import CLAUDE_MODELS
+            for m in CLAUDE_MODELS:
+                models.append({
+                    "id": m["id"],
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "anthropic",
+                })
+        
+        # Antigravity Claude 模型（仅当有 Antigravity 凭证时显示）
+        if has_agy_creds and settings.antigravity_enabled:
+            agy_claude_models = [
+                "agy-claude-opus-4-5", "agy-claude-opus-4-5-thinking",
+                "agy-claude-sonnet-4-5", "agy-claude-sonnet-4-5-thinking",
+            ]
+            for model_id in agy_claude_models:
+                models.append({
+                    "id": model_id,
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "google",
+                })
+        
+        return {"object": "list", "data": models}
+    
+    # ===== 非 Anthropic 客户端：返回所有模型 =====
     
     # ===== 检查用户是否有 GeminiCLI 凭证 =====
     cli_creds_result = await db.execute(
