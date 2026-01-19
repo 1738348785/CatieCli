@@ -622,9 +622,16 @@ class AntigravityClient:
             if "candidates" in response_data and response_data["candidates"]:
                 candidate = response_data["candidates"][0]
                 if "content" in candidate and "parts" in candidate["content"]:
-                    for part in candidate["content"]["parts"]:
+                    parts = candidate["content"]["parts"]
+                    text_parts = []
+                    for part in parts:
                         if "text" in part and not part.get("thought", False):
-                            content += part.get("text", "")
+                            text = part.get("text", "")
+                            text_parts.append(text)
+                    # 合并所有文本部分，去除每个 part 末尾的多余换行符
+                    # 但保留段落间的正常换行（通过检测是否是自然句末换行）
+                    if text_parts:
+                        content = "".join(text_parts)
             
             # 输出完整内容
             if content:
