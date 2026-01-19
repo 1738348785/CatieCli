@@ -650,7 +650,9 @@ class AntigravityClient:
                     for part in parts:
                         if "text" in part and not part.get("thought", False):
                             text = part.get("text", "")
-                            text_parts.append(text)
+                            # 过滤掉 Gemini API 的特殊标记（如 PAGEABLE_STATUSBAR）
+                            if text and not text.startswith("<-") and not text.endswith("->"):
+                                text_parts.append(text)
                     # 合并所有文本部分，去除每个 part 末尾的多余换行符
                     # 但保留段落间的正常换行（通过检测是否是自然句末换行）
                     if text_parts:
@@ -871,7 +873,10 @@ class AntigravityClient:
                         reasoning_content += part.get("text", "")
                     # 处理普通文本 (非思考)
                     elif "text" in part and not part.get("thought", False):
-                        content += part.get("text", "")
+                        text = part.get("text", "")
+                        # 过滤掉 Gemini API 的特殊标记（如 PAGEABLE_STATUSBAR）
+                        if text and not text.startswith("<-") and not text.endswith("->"):
+                            content += text
                     # 处理图片 (inlineData)
                     elif "inlineData" in part:
                         inline_data = part["inlineData"]
@@ -981,7 +986,10 @@ class AntigravityClient:
                             reasoning_content += part.get("text", "")
                         # 处理普通文本 (非思考，且未被 extract_tool_calls_from_parts 处理)
                         elif "text" in part and not part.get("thought", False):
-                            content += part.get("text", "")
+                            text = part.get("text", "")
+                            # 过滤掉 Gemini API 的特殊标记（如 PAGEABLE_STATUSBAR）
+                            if text and not text.startswith("<-") and not text.endswith("->"):
+                                content += text
                         # 处理图片 (inlineData)
                         elif "inlineData" in part:
                             inline_data = part["inlineData"]
