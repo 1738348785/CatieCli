@@ -1066,8 +1066,10 @@ async def gemini_generate_content(
         from app.routers.antigravity_gemini import gemini_generate_content as agy_gemini_generate_content
         return await agy_gemini_generate_content(request, background_tasks, model, user, db)
     
-    # 对于 GeminiCLI：使用流式前缀 + 基础模型名
-    model = stream_prefix + base_model
+    # 对于 GeminiCLI：记录是否使用假流式，模型名用于日志
+    use_fake_streaming = stream_prefix == "假流/"
+    display_model = stream_prefix + base_model  # 用于日志显示
+    api_model = base_model  # 发送给 Google API 的模型名（不含假流前缀）
     
     # 检查用户是否参与大锅饭
     user_has_public = await CredentialPool.check_user_has_public_creds(db, user.id)
@@ -1136,10 +1138,11 @@ async def gemini_generate_content(
             continue
         
         project_id = credential.project_id or ""
-        print(f"[Gemini API] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}" +
+        print(f"[Gemini API] 使用凭证: {credential.email}, project_id: {project_id}, model: {api_model}" +
+              (f" (假流式)" if use_fake_streaming else "") +
               (f" (重试 {retry_attempt}/{max_retries})" if retry_attempt > 0 else ""), flush=True)
         
-        payload = {"model": model, "project": project_id, "request": request_body}
+        payload = {"model": api_model, "project": project_id, "request": request_body}
         
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -1155,7 +1158,7 @@ async def gemini_generate_content(
                     log = UsageLog(
                         user_id=user.id,
                         credential_id=credential.id,
-                        model=model,
+                        model=display_model,
                         endpoint="/v1beta/generateContent",
                         status_code=200,
                         latency_ms=latency,
@@ -1169,7 +1172,7 @@ async def gemini_generate_content(
                     # WebSocket 实时通知
                     await notify_log_update({
                         "username": user.username,
-                        "model": model,
+                        "model": display_model,
                         "status_code": 200,
                         "latency_ms": round(latency, 0),
                         "created_at": datetime.utcnow().isoformat()
@@ -1205,7 +1208,7 @@ async def gemini_generate_content(
                 log = UsageLog(
                     user_id=user.id,
                     credential_id=credential.id,
-                    model=model,
+                    model=display_model,
                     endpoint="/v1beta/generateContent",
                     status_code=response.status_code,
                     latency_ms=attempt_latency,
@@ -1223,7 +1226,7 @@ async def gemini_generate_content(
                 # WebSocket 实时通知
                 await notify_log_update({
                     "username": user.username,
-                    "model": model,
+                    "model": display_model,
                     "status_code": response.status_code,
                     "error_type": error_type,
                     "latency_ms": round(attempt_latency, 0),
@@ -1260,7 +1263,7 @@ async def gemini_generate_content(
             log = UsageLog(
                 user_id=user.id,
                 credential_id=credential.id if credential else None,
-                model=model,
+                model=display_model,
                 endpoint="/v1beta/generateContent",
                 status_code=status_code,
                 latency_ms=attempt_latency,
@@ -1278,7 +1281,7 @@ async def gemini_generate_content(
             # WebSocket 实时通知
             await notify_log_update({
                 "username": user.username,
-                "model": model,
+                "model": display_model,
                 "status_code": status_code,
                 "error_type": error_type,
                 "latency_ms": round(attempt_latency, 0),
@@ -1358,8 +1361,10 @@ async def gemini_stream_generate_content(
         from app.routers.antigravity_gemini import gemini_stream_generate_content as agy_gemini_stream
         return await agy_gemini_stream(request, background_tasks, model, user, db)
     
-    # 对于 GeminiCLI：使用流式前缀 + 基础模型名
-    model = stream_prefix + base_model
+    # 对于 GeminiCLI：记录是否使用假流式，模型名用于日志
+    use_fake_streaming = stream_prefix == "假流/"
+    display_model = stream_prefix + base_model  # 用于日志显示
+    api_model = base_model  # 发送给 Google API 的模型名（不含假流前缀）
     
     # 检查用户是否参与大锅饭
     user_has_public = await CredentialPool.check_user_has_public_creds(db, user.id)
@@ -1423,7 +1428,8 @@ async def gemini_stream_generate_content(
     first_credential_email = credential.email
     user_id = user.id
     username = user.username
-    print(f"[Gemini Stream] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
+    print(f"[Gemini Stream] 使用凭证: {credential.email}, project_id: {project_id}, model: {api_model}" +
+          (f" (假流式)" if use_fake_streaming else ""), flush=True)
     
     # ✅ 主db连接到此处结束使用，流式生成器将使用独立会话
     
@@ -1446,7 +1452,7 @@ async def gemini_stream_generate_content(
                 log = UsageLog(
                     user_id=user_id,
                     credential_id=cred_id,
-                    model=model,
+                    model=display_model,
                     endpoint="/v1beta/streamGenerateContent",
                     status_code=status_code,
                     latency_ms=latency,
@@ -1474,7 +1480,7 @@ async def gemini_stream_generate_content(
                 # WebSocket 实时通知
                 await notify_log_update({
                     "username": username,
-                    "model": model,
+                    "model": display_model,
                     "status_code": status_code,
                     "error_type": error_type,
                     "latency_ms": round(latency, 0),
@@ -1485,8 +1491,173 @@ async def gemini_stream_generate_content(
         except Exception as log_err:
             print(f"[Gemini Stream] ❌ 后台日志记录失败: {log_err}", flush=True)
     
-    async def stream_generator_with_retry():
-        """🚀 流式生成器（带重试功能，使用独立会话进行数据库操作）"""
+    async def fake_stream_generator_with_retry():
+        """🎭 假流式生成器：调用非流式 API，期间发送心跳，最后模拟流式输出"""
+        import asyncio
+        nonlocal access_token, project_id, tried_credential_ids
+        current_cred_id = first_credential_id
+        current_cred_email = first_credential_email
+        last_error = None
+        
+        # 非流式 API 端点
+        non_stream_url = "https://cloudcode-pa.googleapis.com/v1internal:generateContent"
+        
+        for stream_retry in range(max_retries + 1):
+            payload = {"model": api_model, "project": project_id, "request": request_body}
+            
+            try:
+                # 创建异步任务调用非流式 API
+                async def call_api():
+                    async with httpx.AsyncClient(timeout=600.0) as client:
+                        return await client.post(
+                            non_stream_url,
+                            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+                            json=payload
+                        )
+                
+                api_task = asyncio.create_task(call_api())
+                
+                # 🔄 在等待期间发送心跳（每2秒一次空响应）
+                heartbeat_count = 0
+                while not api_task.done():
+                    await asyncio.sleep(2)
+                    if not api_task.done():
+                        heartbeat_count += 1
+                        # 发送 Gemini 格式的心跳（空的 candidates）
+                        heartbeat = {"candidates": [{"content": {"parts": [{"text": ""}], "role": "model"}}]}
+                        yield f"data: {json.dumps(heartbeat)}\n\n"
+                        print(f"[Gemini FakeStream] 💓 心跳 #{heartbeat_count}", flush=True)
+                
+                # 获取完整响应
+                response = await api_task
+                
+                if response.status_code != 200:
+                    error_text = response.text[:500]
+                    last_error = f"API Error {response.status_code}: {error_text}"
+                    print(f"[Gemini FakeStream] ❌ 错误 {response.status_code}: {error_text}", flush=True)
+                    
+                    # 处理凭证失败
+                    try:
+                        async with async_session() as stream_db:
+                            if response.status_code in [401, 403]:
+                                await CredentialPool.handle_credential_failure(stream_db, current_cred_id, last_error)
+                            elif response.status_code == 429:
+                                await CredentialPool.handle_429_rate_limit(
+                                    stream_db, current_cred_id, model, error_text, dict(response.headers)
+                                )
+                    except Exception as db_err:
+                        print(f"[Gemini FakeStream] ⚠️ 处理凭证失败时出错: {db_err}", flush=True)
+                    
+                    # 记录日志
+                    attempt_latency = (time.time() - start_time) * 1000
+                    background_tasks.add_task(save_log_background, {
+                        "status_code": response.status_code,
+                        "error_message": error_text,
+                        "latency_ms": attempt_latency,
+                        "cred_id": current_cred_id,
+                        "cred_email": current_cred_email
+                    })
+                    
+                    # 检查是否应该重试
+                    should_retry = response.status_code in [429, 500, 503, 404]
+                    if should_retry and stream_retry < max_retries:
+                        print(f"[Gemini FakeStream] 🔄 切换凭证重试 ({stream_retry + 2}/{max_retries + 1})", flush=True)
+                        try:
+                            async with async_session() as stream_db:
+                                new_credential = await CredentialPool.get_available_credential(
+                                    stream_db, user_id=user_id, user_has_public_creds=user_has_public,
+                                    model=model, exclude_ids=tried_credential_ids
+                                )
+                                if new_credential:
+                                    tried_credential_ids.add(new_credential.id)
+                                    new_token = await CredentialPool.get_access_token(new_credential, stream_db)
+                                    if new_token:
+                                        current_cred_id = new_credential.id
+                                        current_cred_email = new_credential.email
+                                        access_token = new_token
+                                        project_id = new_credential.project_id or ""
+                                        print(f"[Gemini FakeStream] 🔄 切换到凭证: {current_cred_email}", flush=True)
+                                        continue
+                        except Exception as retry_err:
+                            print(f"[Gemini FakeStream] ⚠️ 获取新凭证失败: {retry_err}", flush=True)
+                    
+                    yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_text}'})}\n\n"
+                    return
+                
+                # ✅ 成功：解析响应并模拟流式输出
+                result = response.json()
+                
+                # 内部 API 返回格式是 {"response": {"candidates": ...}}
+                response_data = result.get("response", result)
+                
+                # 输出完整的响应（模拟流式的最后一个 chunk）
+                if "modelVersion" in result:
+                    response_data["modelVersion"] = result["modelVersion"]
+                
+                yield f"data: {json.dumps(response_data)}\n\n"
+                
+                # 成功：记录日志
+                latency = (time.time() - start_time) * 1000
+                background_tasks.add_task(save_log_background, {
+                    "status_code": 200,
+                    "latency_ms": latency,
+                    "cred_id": current_cred_id,
+                    "cred_email": current_cred_email
+                })
+                print(f"[Gemini FakeStream] ✅ 假流式完成，心跳 {heartbeat_count} 次，耗时 {latency:.0f}ms", flush=True)
+                return
+                
+            except Exception as e:
+                error_str = str(e)
+                last_error = error_str
+                print(f"[Gemini FakeStream] ❌ 异常: {error_str}", flush=True)
+                
+                # 处理凭证失败
+                try:
+                    async with async_session() as stream_db:
+                        await CredentialPool.handle_credential_failure(stream_db, current_cred_id, error_str)
+                except Exception as db_err:
+                    print(f"[Gemini FakeStream] ⚠️ 标记凭证失败时出错: {db_err}", flush=True)
+                
+                # 记录日志
+                status_code = extract_status_code(error_str)
+                attempt_latency = (time.time() - start_time) * 1000
+                background_tasks.add_task(save_log_background, {
+                    "status_code": status_code,
+                    "error_message": error_str,
+                    "latency_ms": attempt_latency,
+                    "cred_id": current_cred_id,
+                    "cred_email": current_cred_email
+                })
+                
+                # 检查是否应该重试
+                should_retry = any(code in error_str for code in ["429", "500", "503", "RESOURCE_EXHAUSTED", "ECONNRESET", "ETIMEDOUT"])
+                if should_retry and stream_retry < max_retries:
+                    print(f"[Gemini FakeStream] 🔄 切换凭证重试 ({stream_retry + 2}/{max_retries + 1})", flush=True)
+                    try:
+                        async with async_session() as stream_db:
+                            new_credential = await CredentialPool.get_available_credential(
+                                stream_db, user_id=user_id, user_has_public_creds=user_has_public,
+                                model=model, exclude_ids=tried_credential_ids
+                            )
+                            if new_credential:
+                                tried_credential_ids.add(new_credential.id)
+                                new_token = await CredentialPool.get_access_token(new_credential, stream_db)
+                                if new_token:
+                                    current_cred_id = new_credential.id
+                                    current_cred_email = new_credential.email
+                                    access_token = new_token
+                                    project_id = new_credential.project_id or ""
+                                    print(f"[Gemini FakeStream] 🔄 切换到凭证: {current_cred_email}", flush=True)
+                                    continue
+                    except Exception as retry_err:
+                        print(f"[Gemini FakeStream] ⚠️ 获取新凭证失败: {retry_err}", flush=True)
+                
+                yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_str}'})}\n\n"
+                return
+    
+    async def real_stream_generator_with_retry():
+        """🚀 真流式生成器（带重试功能，使用独立会话进行数据库操作）"""
         nonlocal access_token, project_id, tried_credential_ids
         current_cred_id = first_credential_id
         current_cred_email = first_credential_email
@@ -1494,7 +1665,7 @@ async def gemini_stream_generate_content(
         
         for stream_retry in range(max_retries + 1):
             cd_seconds = None
-            payload = {"model": model, "project": project_id, "request": request_body}
+            payload = {"model": api_model, "project": project_id, "request": request_body}
             
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
@@ -1643,8 +1814,15 @@ async def gemini_stream_generate_content(
                 yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_str}'})}\n\n"
                 return
     
+    # 🎯 根据是否使用假流式选择生成器
+    if use_fake_streaming:
+        stream_generator = fake_stream_generator_with_retry()
+        print(f"[Gemini API] 🎭 使用假流式模式: {display_model}", flush=True)
+    else:
+        stream_generator = real_stream_generator_with_retry()
+    
     return StreamingResponse(
-        stream_generator_with_retry(),
+        stream_generator,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
