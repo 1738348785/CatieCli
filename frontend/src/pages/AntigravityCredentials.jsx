@@ -270,10 +270,10 @@ export default function AntigravityCredentials() {
             </Link>
             <Link
               to="/dashboard"
-              className="text-gray-400 hover:text-white flex items-center gap-1 sm:gap-2 text-sm"
+              className="text-gray-400 hover:text-white flex items-center gap-2"
             >
-              <ArrowLeft size={18} />
-              <span className="hidden xs:inline">返回</span>
+              <ArrowLeft size={20} />
+              返回
             </Link>
           </div>
         </div>
