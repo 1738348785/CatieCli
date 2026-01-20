@@ -245,15 +245,31 @@ async def gemini_generate_content(
                                         while len(collected_candidates) <= idx:
                                             collected_candidates.append({"index": len(collected_candidates), "content": {"role": "model", "parts": []}})
                                         
-                                        # 合并 content.parts（过滤特殊标记）
+                                        # 智能合并 content.parts - 相邻纯文本 parts 合并成一个，同时过滤特殊标记
                                         if "content" in candidate and "parts" in candidate["content"]:
                                             for part in candidate["content"]["parts"]:
-                                                if "text" in part:
-                                                    text = part["text"]
-                                                    # 精确匹配 <-XXX-> 格式的特殊标记，跳过
-                                                    if text and re.fullmatch(r'^<-[A-Z_]+->$', text.strip()):
-                                                        continue
-                                                collected_candidates[idx]["content"]["parts"].append(part)
+                                                if isinstance(part, dict):
+                                                    # 过滤特殊标记（如 <-PAGEABLE_STATUSBAR->）
+                                                    if "text" in part:
+                                                        text = part["text"]
+                                                        if text and re.fullmatch(r'^<-[A-Z_]+->$', text.strip()):
+                                                            continue
+                                                    
+                                                    existing_parts = collected_candidates[idx]["content"]["parts"]
+                                                    
+                                                    # 检查是否是纯文本 part（只有 text 字段）
+                                                    is_pure_text = "text" in part and len(part) == 1
+                                                    
+                                                    # 如果是纯文本，尝试合并到最后一个文本 part
+                                                    if is_pure_text and existing_parts:
+                                                        last_part = existing_parts[-1]
+                                                        # 如果最后一个 part 也是纯文本，合并
+                                                        if isinstance(last_part, dict) and "text" in last_part and len(last_part) == 1:
+                                                            last_part["text"] += part["text"]
+                                                            continue
+                                                    
+                                                    # 否则添加为新 part（包括带 thought 的、inlineData 等）
+                                                    existing_parts.append(part)
                                         
                                         # 更新 finishReason
                                         if "finishReason" in candidate:
