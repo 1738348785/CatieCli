@@ -758,7 +758,6 @@ async def chat_completions(
                     try:
                         async with async_session() as bg_db:
                             # 重新获取凭证
-                            from sqlalchemy import select
                             from app.models.user import Credential as CredentialModel
                             result = await bg_db.execute(select(CredentialModel).where(CredentialModel.id == credential.id))
                             cred_obj = result.scalar_one_or_none()
@@ -930,7 +929,6 @@ async def chat_completions(
                     print(f"[Antigravity Proxy] ⚠️ 流式认证失败，尝试刷新 Token: {current_cred_email}", flush=True)
                     try:
                         async with async_session() as stream_db:
-                            from sqlalchemy import select
                             from app.models.user import Credential as CredentialModel
                             result = await stream_db.execute(select(CredentialModel).where(CredentialModel.id == current_cred_id))
                             cred_obj = result.scalar_one_or_none()
