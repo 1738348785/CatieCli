@@ -1307,13 +1307,22 @@ async def gemini_generate_content(
     use_fake_streaming = stream_prefix == "假流/"
     display_model = stream_prefix + base_model  # 用于日志显示
     
-    # 检测 -search 后缀并移除（但需要记住以便添加 googleSearch 工具）
+    # 检测特殊后缀
     use_search = "-search" in base_model
-    api_model = base_model  # 发送给 Google API 的模型名
+    use_maxthinking = "-maxthinking" in base_model
+    use_nothinking = "-nothinking" in base_model
+    
+    # 清理后缀（Google API 不认识这些后缀）
+    api_model = base_model
     if use_search:
-        # 移除 -search 后缀用于 API 调用
-        api_model = base_model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+        api_model = api_model.replace("-search", "")
         print(f"[Gemini API] 🔍 已启用搜索功能 (googleSearch)", flush=True)
+    if use_maxthinking:
+        api_model = api_model.replace("-maxthinking", "")
+        print(f"[Gemini API] 🧠 已启用最大思考模式 (thinkingBudget=-1)", flush=True)
+    if use_nothinking:
+        api_model = api_model.replace("-nothinking", "")
+        print(f"[Gemini API] 🚫 已禁用思考模式 (thinkingBudget=0)", flush=True)
     
     # 检查用户是否参与大锅饭
     user_has_public = await CredentialPool.check_user_has_public_creds(db, user.id)
@@ -1357,6 +1366,15 @@ async def gemini_generate_content(
     # 自动添加 googleSearch 工具（如果模型名含 -search）
     elif use_search:
         request_body["tools"] = [{"googleSearch": {}}]
+    
+    # 添加 thinking 配置（根据后缀）
+    if use_maxthinking or use_nothinking:
+        if "generationConfig" not in request_body:
+            request_body["generationConfig"] = {}
+        if use_maxthinking:
+            request_body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": -1}
+        elif use_nothinking:
+            request_body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
     
     # 重试逻辑
     max_retries = settings.error_retry_count
@@ -1615,13 +1633,22 @@ async def gemini_stream_generate_content(
     use_fake_streaming = stream_prefix == "假流/"
     display_model = stream_prefix + base_model  # 用于日志显示
     
-    # 检测 -search 后缀并移除（但需要记住以便添加 googleSearch 工具）
+    # 检测特殊后缀
     use_search = "-search" in base_model
-    api_model = base_model  # 发送给 Google API 的模型名
+    use_maxthinking = "-maxthinking" in base_model
+    use_nothinking = "-nothinking" in base_model
+    
+    # 清理后缀（Google API 不认识这些后缀）
+    api_model = base_model
     if use_search:
-        # 移除 -search 后缀用于 API 调用
-        api_model = base_model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+        api_model = api_model.replace("-search", "")
         print(f"[Gemini Stream] 🔍 已启用搜索功能 (googleSearch)", flush=True)
+    if use_maxthinking:
+        api_model = api_model.replace("-maxthinking", "")
+        print(f"[Gemini Stream] 🧠 已启用最大思考模式 (thinkingBudget=-1)", flush=True)
+    if use_nothinking:
+        api_model = api_model.replace("-nothinking", "")
+        print(f"[Gemini Stream] 🚫 已禁用思考模式 (thinkingBudget=0)", flush=True)
     
     # 检查用户是否参与大锅饭
     user_has_public = await CredentialPool.check_user_has_public_creds(db, user.id)
@@ -1665,6 +1692,15 @@ async def gemini_stream_generate_content(
     # 自动添加 googleSearch 工具（如果模型名含 -search）
     elif use_search:
         request_body["tools"] = [{"googleSearch": {}}]
+    
+    # 添加 thinking 配置（根据后缀）
+    if use_maxthinking or use_nothinking:
+        if "generationConfig" not in request_body:
+            request_body["generationConfig"] = {}
+        if use_maxthinking:
+            request_body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": -1}
+        elif use_nothinking:
+            request_body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
     
     # 预先获取第一个凭证（使用主db）
     max_retries = settings.error_retry_count

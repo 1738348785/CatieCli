@@ -51,10 +51,13 @@ class GeminiClient:
             request_body["tools"] = [{"googleSearch": {}}]
             print(f"[GeminiClient] 🔍 已启用搜索功能 (googleSearch)", flush=True)
         
-        # 清理模型名中的 -search 后缀（API 不识别带 -search 的模型名）
+        # 清理模型名中的后缀（API 不识别这些后缀）
         api_model = model
+        # 先处理 -search 后缀
         if use_search:
-            api_model = model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+            api_model = api_model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+        # 再处理 -maxthinking/-nothinking 后缀（这些后缀用于 thinkingConfig，但 API 模型名不能包含）
+        api_model = api_model.replace("-maxthinking", "").replace("-nothinking", "")
         
         payload = {
             "model": api_model,
@@ -124,10 +127,13 @@ class GeminiClient:
             request_body["tools"] = [{"googleSearch": {}}]
             print(f"[GeminiClient] 🔍 已启用搜索功能 (googleSearch) - 流式", flush=True)
         
-        # 清理模型名中的 -search 后缀（API 不识别带 -search 的模型名）
+        # 清理模型名中的后缀（API 不识别这些后缀）
         api_model = model
+        # 先处理 -search 后缀
         if use_search:
-            api_model = model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+            api_model = api_model.replace("-maxthinking-search", "-maxthinking").replace("-nothinking-search", "-nothinking").replace("-search", "")
+        # 再处理 -maxthinking/-nothinking 后缀（这些后缀用于 thinkingConfig，但 API 模型名不能包含）
+        api_model = api_model.replace("-maxthinking", "").replace("-nothinking", "")
         
         payload = {
             "model": api_model,
